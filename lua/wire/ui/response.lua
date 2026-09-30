@@ -153,7 +153,7 @@ function M.render()
   vim.api.nvim_buf_set_extmark(buf, ns, 0, 0, {
     virt_lines = vim.tbl_map(function(l)
       return { { l, hl } }
-    end, res.summary),
+    end, vim.list_extend({ ("Result: %d/%d  %s"):format(viewed, #history, res.summary[1]) }, res.summary, 2)),
     virt_lines_above = true,
   })
   -- virt_lines above line 1 show only through topfill
@@ -222,23 +222,73 @@ function M.yank()
   vim.notify("wire: curl command yanked (unmasked)")
 end
 
-local function set_keys(buf)
-  local function map(lhs, fn)
-    vim.keymap.set("n", lhs, fn, { buffer = buf, nowait = true, silent = true })
-  end
+local function key_list()
+  local list = {}
   for _, t in ipairs(TABS) do
-    map(t.key, function()
-      M.show_tab(t.id)
-    end)
+    list[#list + 1] = {
+      t.key,
+      t.label .. " tab",
+      function()
+        M.show_tab(t.id)
+      end,
+    }
   end
-  map("[", M.prev)
-  map("]", M.next)
-  map("<CR>", M.jump)
-  map("<C-c>", function()
-    require("wire.run").cancel()
-  end)
-  map("Y", M.yank)
-  map("q", M.close)
+  return vim.list_extend(list, {
+    { "[", "previous result", M.prev },
+    { "]", "next result", M.next },
+    { "<CR>", "jump to the section under the cursor (Report tab)", M.jump },
+    {
+      "<C-c>",
+      "cancel the active run",
+      function()
+        require("wire.run").cancel()
+      end,
+    },
+    { "Y", "yank the request as a curl command (unmasked)", M.yank },
+    { "q", "close the window", M.close },
+    { "g?", "show these keys", M.keys_help },
+  })
+end
+
+function M.keys_help()
+  local lines = {}
+  for _, k in ipairs(key_list()) do
+    lines[#lines + 1] = (" %-6s %s "):format(k[1], k[2])
+  end
+  local width = 0
+  for _, l in ipairs(lines) do
+    width = math.max(width, vim.fn.strdisplaywidth(l))
+  end
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.bo[buf].modifiable = false
+  vim.bo[buf].bufhidden = "wipe"
+  local win = vim.api.nvim_open_win(buf, true, {
+    relative = "win",
+    row = 1,
+    col = 1,
+    width = width,
+    height = #lines,
+    style = "minimal",
+    border = "rounded",
+    title = " wire keys ",
+    title_pos = "center",
+  })
+  local function close()
+    if vim.api.nvim_win_is_valid(win) then
+      vim.api.nvim_win_close(win, true)
+    end
+  end
+  for _, lhs in ipairs({ "q", "<Esc>", "g?" }) do
+    vim.keymap.set("n", lhs, close, { buffer = buf, nowait = true, silent = true })
+  end
+  vim.api.nvim_create_autocmd("WinLeave", { buffer = buf, once = true, callback = close })
+end
+
+local function set_keys(buf)
+  for _, k in ipairs(key_list()) do
+    vim.keymap.set("n", k[1], k[3], { buffer = buf, nowait = true, silent = true, desc = "wire: " .. k[2] })
+  end
 end
 
 local function ensure_window()

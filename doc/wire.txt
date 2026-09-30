@@ -359,6 +359,11 @@ text (green on success, red on failure). Focus stays in the `.http` buffer.
   Y    Yank the request as an unmasked `curl -K -` heredoc into
        |v:register|.
   q    Close.
+  g?   List these keys.
+
+The first summary line starts with the result's place in history,
+`Result: 2/5`, and, for a run that sent several requests, its place in that
+run, `Request: 3/14`.
 
 The tabs are also clickable in the winbar. A result with a failed test opens
 on Report, an abort on Script Output; otherwise a visible window keeps its

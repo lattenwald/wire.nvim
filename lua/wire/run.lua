@@ -194,10 +194,9 @@ local function summary_lines(res, line)
     end) and "passed" or "failed"
   end
   local url = res.request and (res.request.method .. " " .. res.request.url) or ""
+  local position = res.total > 1 and ("Request: %d/%d  "):format(res.index, res.total) or ""
   return {
-    mask.apply(
-      ("Request: %d/%d  %s  Time: %s"):format(res.index, res.total, status, os.date("%b %d %H:%M:%S", res.time))
-    ),
+    mask.apply(("%s%s  Time: %s"):format(position, status, os.date("%b %d %H:%M:%S", res.time))),
     mask.apply(("URL: %s  Env: %s  Assert: %s"):format(url, res.env, asserts)),
     mask.apply(("Buffer: %s::%d  Name: %s"):format(res.file, line, res.section_name)),
   }
