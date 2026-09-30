@@ -6,7 +6,9 @@ scratchpad, environments, and Lua scripting with tests. The design is in
 
 Requires Neovim ≥ 0.12 and `curl` ≥ 7.83. Optional: `jq` (JSON pretty-printing) and the
 `json` tree-sitter parser (JSON body highlighting). wire highlights `.http` buffers itself
-and stops tree-sitter's `http` highlighter there.
+and stops tree-sitter's `http` highlighter there. The Report tab is a markdown table: a
+markdown renderer such as [render-markdown.nvim](https://github.com/MeanderingProgrammer/render-markdown.nvim)
+draws it with borders, and without one it reads as aligned plain text.
 
 ## Setup
 

@@ -28,8 +28,9 @@ Lua test scripts. Responses open in a split with tabs for the body, headers,
 the request as sent, script output and a per-run report.
 
 Requirements: Neovim >= 0.12 and `curl` >= 7.83. Optional: `jq` (JSON
-pretty-printing, key order kept) and the `json` tree-sitter parser (JSON body
-highlighting). Run |:checkhealth| wire to check them.
+pretty-printing, key order kept), the `json` tree-sitter parser (JSON body
+highlighting) and a markdown renderer such as render-markdown.nvim (draws
+the Report tab's table; without one it reads as aligned plain text). Run |:checkhealth| wire to check them.
 
 ==============================================================================
 2. SETUP                                                          *wire-setup*
