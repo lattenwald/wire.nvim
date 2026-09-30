@@ -41,8 +41,8 @@ function M.build(results)
       r
     )
     for _, t in ipairs(r.tests) do
+      add(("        %s %s"):format(t.ok and "✔" or "✘", t.name), r)
       if not t.ok then
-        add("        " .. t.name, r)
         for _, m in ipairs(t.messages) do
           for _, l in ipairs(vim.split(m, "\n", { plain = true })) do
             add("          " .. l, r)

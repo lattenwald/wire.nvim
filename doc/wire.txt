@@ -352,7 +352,8 @@ text (green on success, red on failure). Focus stays in the `.http` buffer.
   A    Headers and body.
   V    Verbose: the request as sent, then the response status and headers.
   O    Script Output: `log()` output and script errors.
-  R    Report: one row per section of the run.
+  R    Report: one row per section of the run, each test under it with
+       `✔`/`✘`, and the messages of failed assertions.
   [ ]  Previous / next result (the last 50 are kept).
   <CR> On a Report row: jump to that section.
   <C-c> Cancel the active run.
