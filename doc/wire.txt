@@ -30,11 +30,19 @@ the request as sent, script output and a per-run report.
 Requirements: Neovim >= 0.12 and `curl` >= 7.83. Optional: `jq` (JSON
 pretty-printing, key order kept), the `json` tree-sitter parser (JSON body
 highlighting) and a markdown renderer such as render-markdown.nvim (draws
-the Report tab's table; without one it reads as aligned plain text). Run |:checkhealth| wire to check them.
+the Report tab's table; without one it reads as aligned plain text). Run
+|:checkhealth| wire to check them.
 
 ==============================================================================
 2. SETUP                                                          *wire-setup*
 
+`setup()` must be called: it adds the autocmds for highlighting, project
+discovery and trusting files you save.
+
+With vim.pack: >lua
+    vim.pack.add({ "https://github.com/lattenwald/wire.nvim" })
+    require("wire").setup({})
+<
 With lazy.nvim: >lua
     {
       "lattenwald/wire.nvim",

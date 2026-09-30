@@ -4,23 +4,34 @@ A small `.http` client for Neovim: send the request at the cursor or the whole f
 scratchpad, environments, and Lua scripting with tests. The design is in
 [docs/design.md](docs/design.md).
 
-Requires Neovim ≥ 0.12 and `curl` ≥ 7.83. Optional: `jq` (JSON pretty-printing) and the
-`json` tree-sitter parser (JSON body highlighting). wire highlights `.http` buffers itself
-and stops tree-sitter's `http` highlighter there. The Report tab is a markdown table: a
-markdown renderer such as [render-markdown.nvim](https://github.com/MeanderingProgrammer/render-markdown.nvim)
-draws it with borders, and without one it reads as aligned plain text.
+## Requirements
 
-## Setup
+- Neovim ≥ 0.12
+- `curl` ≥ 7.83
+
+Optional:
+
+- `jq`: JSON bodies are pretty-printed with their key order kept.
+- the `json` tree-sitter parser: JSON bodies are highlighted. wire highlights `.http`
+  buffers itself and stops tree-sitter's `http` highlighter there.
+- a markdown renderer such as
+  [render-markdown.nvim](https://github.com/MeanderingProgrammer/render-markdown.nvim): the
+  Report tab is a markdown table, drawn with borders by a renderer and readable as aligned
+  plain text without one.
+
+## Installation
+
+`setup()` must be called: it adds the autocmds for highlighting, project discovery and
+trusting env and helper files you save. Run `:checkhealth wire` afterwards.
+
+### [lazy.nvim](https://github.com/folke/lazy.nvim)
 
 ```lua
 {
   "lattenwald/wire.nvim",
   ft = "http",
   cmd = "Wire",
-  opts = {
-    helpers = {},  -- global helper files
-    timeout = nil, -- seconds; nil = no overall limit
-  },
+  opts = {},
   keys = {
     { "<leader>Rs", "<cmd>Wire send<cr>", desc = "Send request" },
     { "<leader>Ra", "<cmd>Wire all<cr>", desc = "Send all requests" },
@@ -30,6 +41,31 @@ draws it with borders, and without one it reads as aligned plain text.
     { "<leader>Ro", "<cmd>Wire open<cr>", desc = "Open response window" },
   },
 }
+```
+
+### [vim.pack](https://neovim.io/doc/user/pack.html#vim.pack)
+
+```lua
+vim.pack.add({ "https://github.com/lattenwald/wire.nvim" })
+require("wire").setup({})
+
+vim.keymap.set("n", "<leader>Rs", "<cmd>Wire send<cr>", { desc = "Send request" })
+vim.keymap.set("n", "<leader>Ra", "<cmd>Wire all<cr>", { desc = "Send all requests" })
+vim.keymap.set("n", "<leader>Rb", "<cmd>Wire scratch<cr>", { desc = "Scratchpad" })
+vim.keymap.set("n", "<leader>Re", "<cmd>Wire env<cr>", { desc = "Select environment" })
+vim.keymap.set("n", "<leader>Rc", "<cmd>Wire cancel<cr>", { desc = "Cancel run" })
+vim.keymap.set("n", "<leader>Ro", "<cmd>Wire open<cr>", { desc = "Open response window" })
+```
+
+wire defines no global mappings; the keys above are a suggestion.
+
+## Configuration
+
+```lua
+require("wire").setup({
+  helpers = {},  -- global helper files, loaded before each project's http-client.lua
+  timeout = nil, -- overall limit per request in seconds; nil = none (connect timeout is 10 s)
+})
 ```
 
 `:Wire send|all|cancel|open|env|scratch|reset`. Statusline: `require("wire").env()`.
