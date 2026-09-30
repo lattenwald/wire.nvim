@@ -14,6 +14,8 @@ end
 function M.setup(opts)
   require("wire.config").setup(opts)
   local project = require("wire.project")
+  local highlight = require("wire.highlight")
+  highlight.setup()
   local group = vim.api.nvim_create_augroup("wire", { clear = true })
   project.setup_auto_trust(group)
   vim.api.nvim_create_autocmd("FileType", {
@@ -21,15 +23,16 @@ function M.setup(opts)
     pattern = "http",
     callback = function(ev)
       project.refresh(ev.buf)
+      highlight.enable(ev.buf)
     end,
   })
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype == "http" then
       project.refresh(buf)
+      highlight.enable(buf)
     end
   end
   require("wire.env").load_state()
-  require("wire.highlight").setup()
 end
 
 local function hooks()

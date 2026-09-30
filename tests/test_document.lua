@@ -11,8 +11,8 @@ T["preamble < is a helper import, section < is a pre-script"] = function()
     "< ./pre.lua",
     "GET http://h/a",
   })
-  eq(doc.preamble.imports, { { kind = "file", path = "./helpers.lua", line = 1 } })
-  eq(doc.sections[1].pre, { { kind = "file", path = "./pre.lua", line = 4 } })
+  eq(doc.preamble.imports, { { kind = "file", path = "./helpers.lua", line = 1, last = 1 } })
+  eq(doc.sections[1].pre, { { kind = "file", path = "./pre.lua", line = 4, last = 4 } })
 end
 
 T["body drops a trailing comment; a lone # keeps the next line"] = function()

@@ -16,10 +16,10 @@ function M.check()
   else
     h.warn("jq not found: JSON bodies are shown as received")
   end
-  if vim.treesitter.language.add("http") then
-    h.ok("http tree-sitter parser found")
+  if vim.treesitter.language.add("json") then
+    h.ok("json tree-sitter parser found")
   else
-    h.warn("http tree-sitter parser not found: no highlighting")
+    h.warn("json tree-sitter parser not found: JSON bodies are not highlighted")
   end
   local buf = vim.api.nvim_get_current_buf()
   if vim.bo[buf].filetype ~= "http" then

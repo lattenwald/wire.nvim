@@ -3,6 +3,8 @@ local M = {}
 local PLACEHOLDER = "{{%s*([%w_.$-]+)%s*}}"
 local QUOTE, BACKSLASH = 34, 92
 
+M.PLACEHOLDER = PLACEHOLDER
+
 local function scan(s, st)
   for i = 1, #s do
     local c = s:byte(i)

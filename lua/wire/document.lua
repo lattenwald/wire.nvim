@@ -34,17 +34,17 @@ end
 local function read_script(lines, i, to)
   local rest = vim.trim(lines[i]:sub(2))
   if rest:sub(1, 2) ~= "{%" then
-    return { kind = "file", path = rest, line = i }, i + 1
+    return { kind = "file", path = rest, line = i, last = i }, i + 1
   end
   local first = rest:sub(3)
   if vim.trim(first):sub(-2) == "%}" then
-    return { kind = "inline", code = vim.trim(first):sub(1, -3), line = i }, i + 1
+    return { kind = "inline", code = vim.trim(first):sub(1, -3), line = i, last = i }, i + 1
   end
   local code = { first }
   for j = i + 1, to do
     if vim.trim(lines[j]):sub(-2) == "%}" then
       code[#code + 1] = (lines[j]:gsub("%%}%s*$", ""))
-      return { kind = "inline", code = table.concat(code, "\n"), line = i }, j + 1
+      return { kind = "inline", code = table.concat(code, "\n"), line = i, last = j }, j + 1
     end
     code[#code + 1] = lines[j]
   end
@@ -119,6 +119,7 @@ local function parse_section(lines, from, to, sec)
     req.url = req.url .. vim.trim(lines[i])
     i = i + 1
   end
+  req.last = i - 1
   req.url = req.url:gsub("%s+HTTP/[%d.]+$", "")
 
   local state, body = "headers", {}
@@ -127,6 +128,7 @@ local function parse_section(lines, from, to, sec)
     if state == "headers" then
       if is_blank(l) then
         state = "body"
+        req.body_line = i + 1
       elseif not is_comment(l) then
         local name, value = parse_header(l)
         if not name then

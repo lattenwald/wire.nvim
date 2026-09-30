@@ -5,7 +5,8 @@ scratchpad, environments, and Lua scripting with tests. The design is in
 [docs/design.md](docs/design.md).
 
 Requires Neovim ≥ 0.12 and `curl` ≥ 7.83. Optional: `jq` (JSON pretty-printing) and the
-`http` tree-sitter parser (highlighting).
+`json` tree-sitter parser (JSON body highlighting). wire highlights `.http` buffers itself
+and stops tree-sitter's `http` highlighter there.
 
 ## Setup
 
