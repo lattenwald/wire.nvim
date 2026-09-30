@@ -31,6 +31,7 @@ and stops tree-sitter's `http` highlighter there.
 ```
 
 `:Wire send|all|cancel|open|env|scratch|reset`. Statusline: `require("wire").env()`.
+Full documentation: `:help wire`.
 
 ## The dialect
 

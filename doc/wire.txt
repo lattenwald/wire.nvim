@@ -1,0 +1,411 @@
+*wire.txt*                                  A small .http client for Neovim
+
+==============================================================================
+CONTENTS                                                       *wire-contents*
+
+  1. Introduction ........................................ |wire|
+  2. Setup ............................................... |wire-setup|
+  3. Commands ............................................ |wire-commands|
+  4. The .http file ...................................... |wire-dialect|
+  5. Variables ........................................... |wire-variables|
+  6. Lua expressions ..................................... |wire-expressions|
+  7. Scripts and tests ................................... |wire-scripts|
+  8. Helpers ............................................. |wire-helpers|
+  9. Environments ........................................ |wire-environments|
+ 10. Headers and bodies .................................. |wire-headers|
+ 11. Trust ............................................... |wire-trust|
+ 12. Secret masking ...................................... |wire-masking|
+ 13. Response window ..................................... |wire-response|
+ 14. Highlighting ........................................ |wire-highlight|
+ 15. Lua API ............................................. |wire-api|
+
+==============================================================================
+1. INTRODUCTION                                                         *wire*
+
+wire sends the requests in `.http` files with `curl`: the request at the
+cursor or the whole file, with variables, environments, Lua expressions and
+Lua test scripts. Responses open in a split with tabs for the body, headers,
+the request as sent, script output and a per-run report.
+
+Requirements: Neovim >= 0.12 and `curl` >= 7.83. Optional: `jq` (JSON
+pretty-printing, key order kept) and the `json` tree-sitter parser (JSON body
+highlighting). Run |:checkhealth| wire to check them.
+
+==============================================================================
+2. SETUP                                                          *wire-setup*
+
+With lazy.nvim: >lua
+    {
+      "lattenwald/wire.nvim",
+      ft = "http",
+      cmd = "Wire",
+      opts = {},
+      keys = {
+        { "<leader>Rs", "<cmd>Wire send<cr>", desc = "Send request" },
+        { "<leader>Ra", "<cmd>Wire all<cr>", desc = "Send all requests" },
+        { "<leader>Rb", "<cmd>Wire scratch<cr>", desc = "Scratchpad" },
+        { "<leader>Re", "<cmd>Wire env<cr>", desc = "Select environment" },
+        { "<leader>Rc", "<cmd>Wire cancel<cr>", desc = "Cancel run" },
+        { "<leader>Ro", "<cmd>Wire open<cr>", desc = "Open response" },
+      },
+    }
+<
+                                                                *wire-options*
+`setup(opts)` takes:
+
+  helpers    List of global helper files, loaded before the project's own
+             (|wire-helpers|). Default: none.
+  timeout    Overall limit per request in seconds (curl `--max-time`).
+             Default: none; the connect timeout is always 10 s.
+
+wire defines no global mappings.
+
+==============================================================================
+3. COMMANDS                                                    *wire-commands*
+
+                                                                       *:Wire*
+:Wire send      Send the request under the cursor. Also `:Wire` alone.
+:Wire all       Send every request in the file, top to bottom.
+:Wire cancel    Cancel the active run.
+:Wire open      Show the response window on the latest result, without
+                sending.
+:Wire env       Pick the environment for the file's project
+                (|wire-environments|).
+:Wire scratch   Open the scratchpad, `stdpath("data")/wire/scratchpad.http`.
+                Its base directory is the cwd at the moment you run this.
+:Wire reset     Clear the script variables of the current buffer.
+
+One run is active at a time; starting another, `:Wire env` or `:Wire reset`
+while busy does nothing.
+
+A run stops at the first abort (a script error, an unresolved variable) or
+transport failure. Failed tests and 4xx/5xx statuses are results and do not
+stop it. When the run ends, a summary is notified and the quickfix list
+titled `wire` lists every failed section at its `###` line.
+
+Before anything is sent, the whole run is checked: parse errors, env files,
+helpers and scripts. Any problem refuses the run with its file and line, and
+nothing goes out.
+
+==============================================================================
+4. THE .HTTP FILE                                               *wire-dialect*
+
+>http
+    < ./helpers.lua
+    @base = https://api.example.com
+
+    ### Create item
+    POST {{base}}/items
+    Authorization: Bearer {{token}}
+    Content-Type: application/json
+
+    {"name": "{{name}}", "at": "{%= os.date('!%Y-%m-%dT%H:%M:%SZ') %}"}
+
+    > {%
+    vars.id = response.json.id
+    test("created", function(t)
+      t.eq(response.status, 201)
+    end)
+    %}
+<
+Every line starting with `###` starts a section; the text after it is the
+request's name. Use one `###` line per request and single `#` for banners and
+prose.
+
+Lines before the first `###` (the preamble) hold document variables
+(`@x = value`), helper imports (`< ./file.lua`, `< {% ... %}`), blank lines
+and comments.
+
+A section is read in this order:
+  1. Section variables (`@x = value`) and pre-request scripts (`<`).
+  2. The request line: `METHOD url`, optionally followed by `HTTP/x`
+     (ignored). Indented lines right after it continue the URL.
+  3. Headers, `Name: value`, up to the first blank line.
+  4. The body, up to a line starting with `> ` or the end of the section.
+     Trailing blank and comment lines are dropped.
+  5. Post-response scripts (`>`).
+
+Comments are lines starting with `#` or `//`; outside a body they never affect
+the next line. Any other line refuses the run with its line number, and so
+does a request line inside a body (a forgotten `###`). Lines the parser
+rejects are underlined in the buffer (|wire-highlight|).
+
+==============================================================================
+5. VARIABLES                                                  *wire-variables*
+
+`{{name}}` works in variable values, the URL, header values, the body and env
+file values. Names are `[A-Za-z0-9_.$-]+`; a dot is part of the name.
+
+Resolution order, first hit wins:
+  1. Section variables (`@x` inside the section).
+  2. Script variables, set with `vars.X = v` in scripts. They are kept per
+     buffer for the session, so a login's token feeds later requests.
+     |:Wire| reset clears them; switching environment clears them for the
+     whole project.
+  3. Document variables (`@x` in the preamble).
+  4. The selected environment (|wire-environments|).
+  5. The process environment.
+
+Values written in the `.http` file and the env files are templates, rendered
+when first used, in the scope of the section being sent: a document variable
+containing `{{zone}}` gets each section's own `@zone`. Script variables and
+process environment values are literal. A cycle aborts with its chain.
+
+An unresolved `{{name}}` aborts the request, and with it the rest of the run
+(with a hint when no environment is selected). `@blank =` declares an empty
+string.
+
+==============================================================================
+6. LUA EXPRESSIONS                                          *wire-expressions*
+
+`{%= expr %}` inserts the value of a one-line Lua expression wherever
+`{{name}}` works: >http
+    @body = {%= render(file(vars.BODY_FILE)) %}
+<
+- The result must be a string, number or boolean; `nil` or a table aborts.
+- The result is inserted as is and never rendered again. Wrap text in
+  `render(s)` to resolve `{{...}}` inside it.
+- Evaluation is lazy: an expression in a variable runs only if the request
+  being sent uses that variable.
+- Variables are `vars.NAME`, never bare names. An unknown bare name raises
+  "unknown name 'X' (variables are vars.X)".
+
+Names available everywhere (expressions, scripts, helpers):
+
+  vars        Read variables (`vars.X`, `nil` if undefined); in scripts,
+              `vars.X = v` sets a script variable (string, number or boolean;
+              `nil` unsets).
+  dir         The base directory: the `.http` file's directory.
+  secret(s)   Registers `s` for masking (|wire-masking|) and returns it.
+  render(s)   Renders `s` as a template in the current section's scope.
+  log(...)    Appends to the Script Output tab.
+
+Plus your helpers (|wire-helpers|) and Lua globals (`vim`, `os`, ...).
+
+==============================================================================
+7. SCRIPTS AND TESTS                                            *wire-scripts*
+                                                                  *wire-tests*
+`< ./file.lua` or `< {% ... %}` inside a section runs before the request;
+pre-scripts shape the request only through `vars`. `> ./file.lua` or
+`> {% ... %}` runs after the response. Inline blocks may be one line or span
+lines up to a line ending in `%}`. Paths are relative to the `.http` file and
+must end in `.lua`.
+
+Post-scripts also see:
+
+  request     The request as sent: `name`, `method`, `url`, `headers`, `body`.
+  response    `status` (number), `headers`, `body` (string), `json` (decoded
+              body, or `nil`). JSON arrays are 1-based.
+  test(name, fn)   Runs `fn(t)` as a named test.
+
+Header tables are keyed by lower-cased name. >lua
+    test("item is created", function(t)
+      local item = response.json
+      t.eq(response.status, 201, "HTTP 201")
+      t.contains(item.name, "widget")
+      t.ok(not item.name:find("DRAFT", 1, true), "draft returned")
+    end)
+<
+  t.ok(cond, msg)             Truthy check.
+  t.eq(got, want, msg)        `vim.deep_equal`; failures show both values.
+  t.contains(s, sub, msg)     Plain substring.
+  t.match(s, pattern, msg)    Lua pattern.
+
+A failed assertion is recorded and the test continues. An error inside `fn`
+fails that test. An error in a pre-script aborts the section; an error in a
+post-script becomes a failed test named after the script, and the run goes
+on. The HTTP status never decides pass or fail by itself.
+
+==============================================================================
+8. HELPERS                                                      *wire-helpers*
+
+A helper file is a Lua chunk returning a table; its values are available by
+name in expressions, scripts and other helpers. Layers, later overriding
+earlier:
+
+  1. Global files from `setup({ helpers = { ... } })`.
+  2. `http-client.lua` in the project directory.
+  3. Preamble imports: `< ./file.lua` or `< {% ... %}`, in order.
+>lua
+    -- http-client.lua
+    local M = {}
+    function M.file(path)
+      local f = assert(io.open(dir .. "/" .. path, "rb"))
+      local s = f:read("*a"):gsub("\n+$", "")
+      f:close()
+      return s
+    end
+    return M
+<
+Helpers are cached by content: edit the file and the next send reloads it.
+They run with the full `vim` API. Code at a helper file's top level runs at
+load time, outside a send, so `vars`, `dir` and the others are only usable
+inside functions.
+
+The project directory is the nearest directory, walking up from the `.http`
+file, that contains `http-client.lua`, `http-client.env.json` or
+`http-client.private.env.json`.
+
+==============================================================================
+9. ENVIRONMENTS                                           *wire-environments*
+
+`http-client.env.json` and `http-client.private.env.json` in the project
+directory hold environments. Keep secrets out of both: reference them through
+a helper. The private file is for machine-local values and should be
+gitignored; every value defined there is masked.
+>json
+    {
+      "$shared": {
+        "$defaultHeaders": { "Accept": "application/json" }
+      },
+      "dev": {
+        "BASE_URL": "https://dev.example.com"
+      }
+    }
+<
+- Every top-level key that is an object and does not start with `$` is an
+  environment. Its other keys are variables; values are templates. Numbers
+  and booleans are converted with `tostring`.
+- The private file is merged over the public one, then each environment over
+  `$shared`. Objects merge deeply, so `$defaultHeaders` merges per header.
+
+Special keys, the only ones starting with `$` that wire reads:
+
+  $shared            Top level: merged under every environment.
+  $defaultHeaders    In an environment or `$shared`: headers added to every
+                     request (|wire-headers|).
+  $schema            Top level: ignored, for editors' JSON schemas.
+
+Any other `$` key is ignored, and a send warns about it with its file and
+environment, e.g. a leftover `$kulalaDefaultHeaders`.
+
+|:Wire| env picks the environment per project; the choice persists in
+`stdpath("state")/wire/env.json`. A project with exactly one environment uses
+it without asking. Switching clears the project's script variables. The
+summary line shows `Env: none` without a selection and `Env: no project`
+outside a project.
+
+==============================================================================
+10. HEADERS AND BODIES                                          *wire-headers*
+
+Headers merge in layers, later winning, names compared case-insensitively:
+curl's own, then `$defaultHeaders`, then the request's. A header whose final
+value is empty is removed, which also removes curl's own header of that name:
+>http
+    ### Metrics, no auth
+    GET {{BASE_URL}}/metrics
+    Authorization:
+<
+wire never adds a Content-Type. A body without one is sent without one
+(curl's implicit form type is removed).
+
+                                                                  *wire-json*
+Values substituted inside a JSON string in the body are JSON-escaped; values
+outside strings are inserted raw, so `"port": {{port}}` works. The body is
+JSON when the merged Content-Type (`$defaultHeaders` included) is
+`application/json` or `*/*+json`, or, without a Content-Type, when the body
+starts with `{` or `[`. Helpers therefore return raw strings; escaping them
+yourself double-escapes. URLs and headers are never escaped; use
+`vim.uri_encode` in an expression when needed.
+
+Bodies are sent as text. External body files (`< ./body.json` as the body)
+are not supported.
+
+==============================================================================
+11. TRUST                                                         *wire-trust*
+
+`http-client.lua` and the env files are found, not named, so they go through
+Neovim's trust database (|:trust|): a cloned repository cannot run code you
+did not approve. An untrusted file refuses the run and Neovim offers to view
+it; run |:trust| in that window, then send again (`:trust ++remove <file>` if
+you denied it).
+
+Saving one of these files from Neovim trusts it automatically. A file changed
+by `git pull` needs `:trust` again. Files the `.http` file names itself
+(`<` and `>` paths) are trusted like the `.http` file, except in the
+scratchpad.
+
+==============================================================================
+12. SECRET MASKING                                              *wire-masking*
+
+wire replaces secret values with `••••` in everything it generates: summary
+lines, the Verbose, Script Output and Report tabs, errors, quickfix entries
+and notifications. Response bodies and headers are shown as received.
+
+Registered as secrets, for the whole session:
+- values passed to `secret(s)`;
+- every variable defined in `http-client.private.env.json`;
+- the values of `Authorization`, `Proxy-Authorization`, `Cookie`,
+  `X-Api-Key` and `Api-Key`, and the credential after `Bearer`/`Basic`.
+
+Values shorter than 4 characters are never masked. `Y` in the response window
+is the one way to copy unmasked text.
+
+==============================================================================
+13. RESPONSE WINDOW                                            *wire-response*
+
+A right-hand split showing one result, with three summary lines above the
+text (green on success, red on failure). Focus stays in the `.http` buffer.
+
+  B    Body, typed by Content-Type; JSON pretty-printed with `jq`.
+  H    Response headers.
+  A    Headers and body.
+  V    Verbose: the request as sent, then the response status and headers.
+  O    Script Output: `log()` output and script errors.
+  R    Report: one row per section of the run.
+  [ ]  Previous / next result (the last 50 are kept).
+  <CR> On a Report row: jump to that section.
+  <C-c> Cancel the active run.
+  Y    Yank the request as an unmasked `curl -K -` heredoc into
+       |v:register|.
+  q    Close.
+
+The tabs are also clickable in the winbar. A result with a failed test opens
+on Report, an abort on Script Output; otherwise a visible window keeps its
+tab. The `###` line of each sent section shows an icon: `✔ 200 · 0.42 s`,
+`✘ 500 · 2 failed`, `✘ aborted`, `✘ cancelled` or the curl error.
+
+==============================================================================
+14. HIGHLIGHTING                                              *wire-highlight*
+
+wire colours `http` buffers from its own parser, so the colours show what a
+send will do, and stops tree-sitter's `http` highlighter there. JSON bodies
+and inline scripts are coloured by the `json` and `lua` tree-sitter parsers.
+Lines the parser rejects are underlined as errors.
+
+Groups, linked by default to standard captures; override with
+|:highlight|:
+
+  WireSeparator     `###` lines               `@markup.heading`
+  WireComment       comments                  `@comment`
+  WireVariable      `@name` in declarations   `@variable`
+  WireOperator      `=` and `:`               `@operator`
+  WireValue         variable values           `@string`
+  WireMethod        request method            `@function.method`
+  WireUrl           request URL               `@string.special.url`
+  WireVersion       `HTTP/x`                  `@string.special`
+  WireHeader        header names              `@constant`
+  WireHeaderValue   header values             `@string`
+  WirePlaceholder   `{{name}}`                `@variable`
+  WireExpression    `{%= ... %}`              `Special`
+  WireScriptMarker  `<`, `>`, `{%`, `%}`      `@punctuation.special`
+  WirePath          script file paths         `@string.special.path`
+  WireError         rejected lines            `DiagnosticUnderlineError`
+
+The body is highlighted as JSON using the section's own Content-Type only;
+`$defaultHeaders` depend on the selected environment.
+
+==============================================================================
+15. LUA API                                                         *wire-api*
+
+`require("wire")`:
+
+  setup(opts)      See |wire-options|.
+  send()           Same as |:Wire| send; `send_all()`, `cancel()`, `open()`,
+                   `reset()`, `select_env()` and `scratchpad()` likewise.
+  env()            The current buffer's environment name, or `nil`. No I/O,
+                   so it suits a statusline.
+  ctx()            During a send, the names of |wire-expressions| for code in
+                   a plain Lua module; errors outside a send.
+
+ vim:tw=78:ts=8:ft=help:norl:

@@ -20,9 +20,14 @@ test: deps/mini.test ## Run the tests headless (one file: FILE=tests/test_x.lua)
 	$(NVIM_BIN) --headless --noplugin -u tests/minimal_init.lua -c "lua wire_test_run('$(FILE)')"
 
 .PHONY: lint
-lint: ## Check formatting and lint
+lint: ## Check formatting, lint and the help file
 	stylua --check lua plugin tests
 	selene lua plugin tests
+	$(NVIM_BIN) --headless --clean --cmd "set rtp^=." -l tests/doccheck.lua
+
+.PHONY: doc
+doc: ## Regenerate doc/tags
+	$(NVIM_BIN) --headless --clean -c "helptags doc" -c q
 
 .PHONY: format
 format: ## Format the Lua sources
