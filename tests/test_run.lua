@@ -237,6 +237,23 @@ T["a broken env file refuses the run"] = function()
   eq(server.requests(), {})
 end
 
+T["an unknown $ key in the env file warns and the request is still sent"] = function()
+  local root = H.tmpdir()
+  H.trust(H.write(root .. "/http-client.env.json", [[{ "dev": { "$kulalaDefaultHeaders": {} } }]]))
+  local buf = H.http_buf(root .. "/r.http", { "### one", "GET " .. server.url .. "/one" })
+  local warnings = {}
+  local notify = vim.notify
+  vim.notify = function(msg, level)
+    if level == vim.log.levels.WARN then
+      warnings[#warnings + 1] = msg
+    end
+  end
+  H.run(buf, "all")
+  vim.notify = notify
+  eq(paths(), { "/one" })
+  eq(table.concat(warnings, "\n"):find("$kulalaDefaultHeaders", 1, true) ~= nil, true)
+end
+
 T["quickfix points at the failing section's ### line"] = function()
   local buf = H.http_buf(H.tmpdir() .. "/r.http", {
     "@base = " .. server.url,

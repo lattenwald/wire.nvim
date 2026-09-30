@@ -31,12 +31,13 @@ function H.server()
       port = port or (data and tonumber(data:match("%d+")))
     end,
   })
-  assert(
-    vim.wait(5000, function()
-      return port ~= nil
-    end),
-    "test server did not start"
-  )
+  local started = vim.wait(5000, function()
+    return port ~= nil
+  end)
+  if not started then
+    proc:kill(9)
+    error("test server did not start")
+  end
   local s = { url = "http://127.0.0.1:" .. port }
   function s.requests()
     local out = {}

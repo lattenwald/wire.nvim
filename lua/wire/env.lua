@@ -50,13 +50,33 @@ local function read(path, untrusted)
   return data
 end
 
+local KNOWN_TOP = { ["$schema"] = true, ["$shared"] = true }
+local KNOWN_ENV = { ["$defaultHeaders"] = true }
+
+local function unknown_keys(data, file, out)
+  for name, value in pairs(data) do
+    if name:sub(1, 1) == "$" and not KNOWN_TOP[name] then
+      out[#out + 1] = ("%s: %s: unknown key"):format(file, name)
+    elseif is_object(value) and (name == "$shared" or name:sub(1, 1) ~= "$") then
+      for k in pairs(value) do
+        if k:sub(1, 1) == "$" and not KNOWN_ENV[k] then
+          out[#out + 1] = ("%s: %s: unknown key %s"):format(file, name, k)
+        end
+      end
+    end
+  end
+end
+
 function M.load(root)
-  local res, untrusted = { names = {}, envs = {} }, {}
+  local res, untrusted = { names = {}, envs = {}, warnings = {} }, {}
   if not root then
     return res, untrusted
   end
   local public = read(root .. "/http-client.env.json", untrusted)
   local private = read(root .. "/http-client.private.env.json", untrusted)
+  unknown_keys(public, "http-client.env.json", res.warnings)
+  unknown_keys(private, "http-client.private.env.json", res.warnings)
+  table.sort(res.warnings)
   local all = merge(public, private)
   for name, value in pairs(all) do
     if name:sub(1, 1) ~= "$" and is_object(value) then

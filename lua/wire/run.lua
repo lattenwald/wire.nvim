@@ -97,6 +97,7 @@ function M.snapshot(buf, which, row)
     root = root,
     env_name = env_name,
     env_unselected = env_name == nil and #envs.names > 0,
+    env_warnings = envs.warnings,
     env_label = env_name or (root and "none" or "no project"),
     env_vars = e.vars or {},
     env_private = e.private or {},
@@ -373,6 +374,13 @@ function M.start(buf, which, row, hooks)
   if not ok then
     vim.notify("wire: " .. mask.apply(snap), vim.log.levels.ERROR)
     return
+  end
+  if #snap.env_warnings > 0 then
+    local lines = vim.tbl_map(function(w)
+      return "wire: " .. w .. " (ignored)"
+    end, snap.env_warnings)
+    lines[#lines + 1] = "see :help wire-environments"
+    vim.notify(table.concat(lines, "\n"), vim.log.levels.WARN)
   end
   run_seq = run_seq + 1
   local run = { id = run_seq, snap = snap, results = {}, index = 0, hooks = hooks, marks = {} }

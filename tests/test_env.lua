@@ -30,6 +30,27 @@ T["only object keys without $ are environments; a single one is current"] = func
   eq(env.current(root, res.names), "dev")
 end
 
+T["unknown $ keys are reported per file; $schema, $shared and $defaultHeaders are not"] = function()
+  local root = H.tmpdir()
+  H.trust(H.write(
+    root .. "/http-client.env.json",
+    [[{
+      "$schema": "x",
+      "$other": {},
+      "$shared": { "$defaultHeaders": {}, "$sharedTypo": {} },
+      "dev": { "$defaultHeaders": {}, "$kulalaDefaultHeaders": {} }
+    }]]
+  ))
+  H.trust(H.write(root .. "/http-client.private.env.json", [[{ "dev": { "$secretHeaders": {} } }]]))
+  local res = env.load(root)
+  eq(res.warnings, {
+    "http-client.env.json: $other: unknown key",
+    "http-client.env.json: $shared: unknown key $sharedTypo",
+    "http-client.env.json: dev: unknown key $kulalaDefaultHeaders",
+    "http-client.private.env.json: dev: unknown key $secretHeaders",
+  })
+end
+
 T["an untrusted env file contributes nothing"] = function()
   local root = H.tmpdir()
   local path = H.write(root .. "/http-client.env.json", [[{ "dev": { "k": "v" } }]])
