@@ -1,0 +1,17 @@
+---
+base: lua51
+globals:
+  vim:
+    any: true
+  MiniTest:
+    any: true
+  # LuaJIT's load takes a string and an environment
+  load:
+    args:
+      - type: any
+      - required: false
+        type: string
+      - required: false
+        type: string
+      - required: false
+        type: table
