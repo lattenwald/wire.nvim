@@ -121,3 +121,7 @@ files go through Neovim's `:trust`; files you save from Neovim are trusted autom
 
 `make test` runs the mini.test suite headless against a loopback server
 (`tests/server.py`, needs `python3`). `make lint` checks formatting and lints.
+
+## License
+
+[MIT](LICENSE)
