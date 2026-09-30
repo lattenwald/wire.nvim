@@ -59,6 +59,15 @@ vim.keymap.set("n", "<leader>Ro", "<cmd>Wire open<cr>", { desc = "Open response 
 
 wire defines no global mappings; the keys above are a suggestion.
 
+### Versions
+
+Releases are tagged `vX.Y.Z` following [semver](https://semver.org), with changes listed
+in [CHANGELOG.md](CHANGELOG.md); the `stable` tag marks the latest release. Before 1.0 a
+breaking change bumps the minor version. `main` gets every change first; to stay on
+releases, add `version = "*"` to the lazy.nvim spec, or pass
+`{ src = "https://github.com/lattenwald/wire.nvim", version = vim.version.range("*") }`
+to `vim.pack.add`.
+
 ## Configuration
 
 ```lua
