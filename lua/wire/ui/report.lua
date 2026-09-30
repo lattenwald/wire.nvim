@@ -14,7 +14,7 @@ local function line_of(r)
 end
 
 local function cell(s)
-  return (s:gsub("\n.*", ""):gsub("|", "\\|"))
+  return (s:gsub("|", "\\|"))
 end
 
 local function pad(s, width, right)
@@ -44,10 +44,29 @@ function M.build(results)
     }
     owners[#rows] = r
     for _, t in ipairs(r.tests) do
-      rows[#rows + 1] = { "", "", cell(("↳ %s %s"):format(t.ok and "✔" or "✘", t.name)), "", "", "" }
+      local name = cell(("↳ %s %s"):format(t.ok and "✔" or "✘", t.name)):gsub("\n", "\n    ")
+      rows[#rows + 1] = { "", "", name, "", "", "" }
       owners[#rows] = r
     end
   end
+
+  local physical, physical_owners = {}, {}
+  for i, row in ipairs(rows) do
+    local parts, height = {}, 1
+    for c, v in ipairs(row) do
+      parts[c] = vim.split(v, "\n", { plain = true })
+      height = math.max(height, #parts[c])
+    end
+    for k = 1, height do
+      local line = {}
+      for c = 1, #row do
+        line[c] = parts[c][k] or ""
+      end
+      physical[#physical + 1] = line
+      physical_owners[#physical] = owners[i]
+    end
+  end
+  rows, owners = physical, physical_owners
 
   local widths = {}
   for c = 1, #HEAD do
