@@ -54,4 +54,30 @@ function H.server()
   return s
 end
 
+function H.http_buf(path, lines)
+  H.write(path, table.concat(lines, "\n") .. "\n")
+  local buf = vim.fn.bufadd(path)
+  vim.fn.bufload(buf)
+  return buf
+end
+
+function H.run(buf, which, row)
+  local results, done = {}, false
+  local run = require("wire.run").start(buf, which, row, {
+    started = function() end,
+    result = function(r)
+      table.insert(results, r)
+    end,
+    finished = function()
+      done = true
+    end,
+  })
+  if run then
+    vim.wait(10000, function()
+      return done
+    end)
+  end
+  return results, done
+end
+
 return H
