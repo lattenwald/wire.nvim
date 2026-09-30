@@ -132,6 +132,15 @@ files go through Neovim's `:trust`; files you save from Neovim are trusted autom
 `make test` runs the mini.test suite headless against a loopback server
 (`tests/server.py`, needs `python3`). `make lint` checks formatting and lints.
 
+## Inspired by
+
+- [kulala.nvim](https://github.com/dont-be-evil-company/kulala.nvim): the response window
+  and inline result icons.
+- [JetBrains HTTP Client](https://www.jetbrains.com/help/idea/http-client-in-product-code-editor.html):
+  the `.http` dialect, `http-client.env.json` environments, and `> {% %}` test scripts.
+- [VS Code REST Client](https://github.com/Huachao/vscode-restclient): `@name = value` file
+  variables.
+
 ## License
 
 [MIT](LICENSE)
