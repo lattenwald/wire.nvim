@@ -62,4 +62,28 @@ T["wire stops a tree-sitter highlighter another handler started"] = function()
   eq(vim.treesitter.highlighter.active[buf], nil)
 end
 
+local function marks(buf)
+  return vim.api.nvim_buf_get_extmarks(buf, vim.api.nvim_create_namespace("wire.highlight"), 0, -1, {})
+end
+
+T["a special buffer with filetype http, like the Headers tab, is left alone"] = function()
+  require("wire").setup({})
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "HTTP 200", "content-type: application/json" })
+  vim.bo[buf].filetype = "http"
+  vim.wait(100)
+  eq(marks(buf), {})
+end
+
+T["highlights are cleared once the buffer's filetype is no longer http"] = function()
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "### a", "GET http://h/x" })
+  vim.bo[buf].filetype = "http"
+  highlight.enable(buf)
+  vim.bo[buf].filetype = "json"
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "{", '  "a": 1', "}" })
+  vim.wait(100)
+  eq(marks(buf), {})
+end
+
 return T

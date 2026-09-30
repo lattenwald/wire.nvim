@@ -254,6 +254,9 @@ local function refresh(buf)
     return
   end
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
+  if vim.bo[buf].filetype ~= "http" then
+    return
+  end
   for _, s in ipairs(M.spans(vim.api.nvim_buf_get_lines(buf, 0, -1, false))) do
     pcall(vim.api.nvim_buf_set_extmark, buf, ns, s.row, s.col, {
       end_row = s.end_row,

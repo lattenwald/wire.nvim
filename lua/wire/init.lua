@@ -22,12 +22,14 @@ function M.setup(opts)
     group = group,
     pattern = "http",
     callback = function(ev)
-      project.refresh(ev.buf)
-      highlight.enable(ev.buf)
+      if vim.bo[ev.buf].buftype == "" then
+        project.refresh(ev.buf)
+        highlight.enable(ev.buf)
+      end
     end,
   })
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype == "http" then
+    if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype == "http" and vim.bo[buf].buftype == "" then
       project.refresh(buf)
       highlight.enable(buf)
     end
