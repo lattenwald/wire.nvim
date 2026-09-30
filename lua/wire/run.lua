@@ -62,6 +62,9 @@ function M.snapshot(buf, which, row)
   local read_import = vim.b[buf].wire_scratch and project.read_trusted or helpers.read_file
   local envs, untrusted = env.load(root)
   local env_name = root and env.current(root, envs.names)
+  if root and #untrusted == 0 then
+    env.remember(root, envs)
+  end
   local hs, untrusted_helpers = helpers.load_all({
     global = config.options.helpers,
     root = root,

@@ -151,4 +151,19 @@ function M.select(root, name)
   f:close()
 end
 
+local defaults = {}
+
+function M.remember(root, envs)
+  local name = M.current(root, envs.names)
+  local headers = name and envs.envs[name].default_headers or {}
+  if not vim.deep_equal(defaults[root], headers) then
+    defaults[root] = headers
+    vim.api.nvim_exec_autocmds("User", { pattern = "WireEnvChanged", data = { root = root } })
+  end
+end
+
+function M.cached_defaults(root)
+  return defaults[root]
+end
+
 return M

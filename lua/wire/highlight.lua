@@ -1,4 +1,6 @@
 local document = require("wire.document")
+local env = require("wire.env")
+local project = require("wire.project")
 local template = require("wire.template")
 
 local M = {}
@@ -34,7 +36,7 @@ local function trimmed_end(l)
   return #(l:gsub("%s+$", ""))
 end
 
-function M.classify(lines)
+function M.classify(lines, defaults)
   local doc = document.parse(lines)
   local spans, regions, taken = {}, {}, {}
 
@@ -138,6 +140,11 @@ function M.classify(lines)
       end
     end
     local content_type
+    for name, value in pairs(defaults or {}) do
+      if name:lower() == "content-type" then
+        content_type = value
+      end
+    end
     for _, h in ipairs(req.headers) do
       local hl = lines[h.line]
       local colon = hl:find(":", #h.name + 1, true)
@@ -158,6 +165,9 @@ function M.classify(lines)
       for n = req.body_line, req.body_line + count - 1 do
         inline(n, 0)
         taken[n] = true
+      end
+      if content_type and (content_type:find("{{", 1, true) or content_type:find("{%=", 1, true)) then
+        content_type = nil
       end
       if template.is_json(content_type, req.body) then
         regions[#regions + 1] = { lang = "json", row = req.body_line - 1, col = 0, text = req.body }
@@ -232,8 +242,8 @@ local function captures(lang, text)
   return out
 end
 
-function M.spans(lines)
-  local spans, regions = M.classify(lines)
+function M.spans(lines, defaults)
+  local spans, regions = M.classify(lines, defaults)
   for _, r in ipairs(regions) do
     for _, c in ipairs(captures(r.lang, r.text)) do
       spans[#spans + 1] = {
@@ -257,7 +267,9 @@ local function refresh(buf)
   if vim.bo[buf].filetype ~= "http" then
     return
   end
-  for _, s in ipairs(M.spans(vim.api.nvim_buf_get_lines(buf, 0, -1, false))) do
+  local root = project.cached_project(buf)
+  local defaults = root and env.cached_defaults(root)
+  for _, s in ipairs(M.spans(vim.api.nvim_buf_get_lines(buf, 0, -1, false), defaults)) do
     pcall(vim.api.nvim_buf_set_extmark, buf, ns, s.row, s.col, {
       end_row = s.end_row,
       end_col = s.end_col,
@@ -303,6 +315,17 @@ function M.setup()
   for group, link in pairs(LINKS) do
     vim.api.nvim_set_hl(0, group, { link = link, default = true })
   end
+  vim.api.nvim_create_autocmd("User", {
+    group = vim.api.nvim_create_augroup("wire.highlight", { clear = true }),
+    pattern = "WireEnvChanged",
+    callback = function(ev)
+      for buf in pairs(attached) do
+        if project.cached_project(buf) == ev.data.root then
+          refresh(buf)
+        end
+      end
+    end,
+  })
 end
 
 return M

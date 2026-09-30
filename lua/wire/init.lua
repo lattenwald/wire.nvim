@@ -108,6 +108,7 @@ function M.select_env()
   }, function(choice)
     if choice and choice ~= current then
       env.select(root, choice)
+      env.remember(root, envs)
       require("wire.context").clear_project_vars(root)
     end
   end)

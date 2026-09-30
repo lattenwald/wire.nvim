@@ -408,8 +408,11 @@ Groups, linked by default to standard captures; override with
   WirePath          script file paths         `@string.special.path`
   WireError         rejected lines            `DiagnosticUnderlineError`
 
-The body is highlighted as JSON using the section's own Content-Type only;
-`$defaultHeaders` depend on the selected environment.
+The body is highlighted as JSON by the same rule a send uses
+(|wire-json|). The environment's `$defaultHeaders` count once a send or
+|:Wire| env in that project has read them; until then only the section's
+own headers do. A templated Content-Type is not evaluated for colouring; the
+body's first character decides.
 
 ==============================================================================
 15. LUA API                                                         *wire-api*

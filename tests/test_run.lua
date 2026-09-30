@@ -85,6 +85,17 @@ T["JSON mode sees a Content-Type that only $defaultHeaders sets"] = function()
   eq(vim.base64.decode(server.requests()[1].body), '{"k": "a"b"}')
 end
 
+T["a send remembers the selected environment's default headers for highlighting"] = function()
+  local root = H.tmpdir()
+  H.trust(
+    H.write(root .. "/http-client.env.json", [[{ "dev": { "$defaultHeaders": { "Content-Type": "text/plain" } } }]])
+  )
+  local buf = H.http_buf(root .. "/r.http", { "### one", "GET " .. server.url .. "/one" })
+  eq(require("wire.env").cached_defaults(root), nil)
+  H.run(buf, "all")
+  eq(require("wire.env").cached_defaults(root), { ["Content-Type"] = "text/plain" })
+end
+
 T["private env values and auth headers are masked in Verbose and logs"] = function()
   local root = H.tmpdir()
   H.trust(

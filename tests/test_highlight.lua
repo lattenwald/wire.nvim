@@ -62,6 +62,20 @@ T["wire stops a tree-sitter highlighter another handler started"] = function()
   eq(vim.treesitter.highlighter.active[buf], nil)
 end
 
+T["a JSON Content-Type from the environment's defaults makes the body a JSON region"] = function()
+  local lines = { "### a", "POST http://h/x", "", '"{{payload}}"' }
+  local _, without = highlight.classify(lines)
+  local _, with = highlight.classify(lines, { ["content-type"] = "application/json" })
+  eq(without, {})
+  eq(with, { { lang = "json", row = 3, col = 0, text = '"{{payload}}"' } })
+end
+
+T["a templated Content-Type is not trusted; the body decides"] = function()
+  local lines = { "### a", "POST http://h/x", "Content-Type: {{ct}}", "", "{}" }
+  local _, regions = highlight.classify(lines, { ["Content-Type"] = "text/plain" })
+  eq(#regions, 1)
+end
+
 local function marks(buf)
   return vim.api.nvim_buf_get_extmarks(buf, vim.api.nvim_create_namespace("wire.highlight"), 0, -1, {})
 end
