@@ -35,6 +35,18 @@ T["body drops a trailing comment; a lone # keeps the next line"] = function()
   eq(doc.sections[2].request.url, "http://h/b")
 end
 
+T[">{% without a space ends the body and starts a post script"] = function()
+  local doc = document.parse({
+    "### A",
+    "POST http://h/a",
+    "",
+    "{}",
+    ">{% vars.id = 1 %}",
+  })
+  eq(doc.sections[1].request.body, "{}")
+  eq(#doc.sections[1].post, 1)
+end
+
 T["one-line and multi-line inline scripts give the same code"] = function()
   local doc = document.parse({
     "### A",

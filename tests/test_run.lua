@@ -59,6 +59,7 @@ T["a script variable reaches the next section; an abort stops the run"] = functi
     end, results),
     { "ok", "ok", "aborted" }
   )
+  eq(#vim.api.nvim_buf_get_extmarks(buf, require("wire.run").ns, 0, -1, {}), 3)
 end
 
 T["JSON mode sees a Content-Type that only $defaultHeaders sets"] = function()
@@ -75,6 +76,21 @@ T["JSON mode sees a Content-Type that only $defaultHeaders sets"] = function()
   })
   H.run(buf, "all")
   eq(vim.base64.decode(server.requests()[1].body), '{"k": "a"b"}')
+end
+
+T["the statusline name follows sends and env file saves"] = function()
+  require("wire").setup({})
+  local root = H.tmpdir()
+  H.trust(H.write(root .. "/http-client.env.json", [[{ "dev": {} }]]))
+  local buf = H.http_buf(root .. "/r.http", { "### one", "GET " .. server.url .. "/one" })
+  vim.api.nvim_set_current_buf(buf)
+  H.run(buf, "all")
+  eq(require("wire").env(), "dev")
+  vim.cmd.edit(root .. "/http-client.env.json")
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, { [[{ "prod": {}, "stage": {} }]] })
+  vim.cmd.write()
+  vim.api.nvim_set_current_buf(buf)
+  eq(require("wire").env(), nil)
 end
 
 T["a send remembers the selected environment's default headers for highlighting"] = function()
@@ -96,7 +112,12 @@ T["private env values and auth headers are masked in Verbose and logs"] = functi
       [[{ "dev": { "tok": "tk-9f8e7d-555", "$defaultHeaders": { "Authorization": "Bearer {{tok}}" } } }]]
     )
   )
-  H.trust(H.write(root .. "/http-client.private.env.json", [[{ "dev": { "key": "{%= 'pv-' .. 'secret-9' %}" } }]]))
+  H.trust(
+    H.write(
+      root .. "/http-client.private.env.json",
+      [[{ "dev": { "key": "{%= 'pv-' .. 'secret-9' %}", "$defaultHeaders": { "X-Token": "ph-secret-7" } } }]]
+    )
+  )
   local buf = H.http_buf(root .. "/r.http", {
     "### one",
     "GET " .. server.url .. "/one",
@@ -107,6 +128,8 @@ T["private env values and auth headers are masked in Verbose and logs"] = functi
   local results = H.run(buf, "all")
   local r = results[1]
   eq(r.verbose:find("pv-secret-9", 1, true), nil)
+  eq(r.verbose:find("ph-secret-7", 1, true), nil)
+  eq(r.verbose:find("X-Token: ••••", 1, true) ~= nil, true)
   eq(r.verbose:find("tk-9f8e7d-555", 1, true), nil)
   eq(r.logs:find("tk-9f8e7d-555", 1, true), nil)
 end
@@ -180,6 +203,33 @@ T["cancel ends the run; a second run is refused while one is active"] = function
   end)
   eq(run.active, nil)
   eq(paths(), { "/hang" })
+end
+
+T["a throwing UI hook does not leave the run active"] = function()
+  local buf = H.http_buf(H.tmpdir() .. "/r.http", {
+    "### one",
+    "GET " .. server.url .. "/one",
+    "### two",
+    "GET " .. server.url .. "/two",
+  })
+  local _, done = H.run(buf, "all", nil, {
+    result = function()
+      error("boom")
+    end,
+  })
+  eq(done, true)
+  eq(require("wire.run").active, nil)
+  eq(paths(), { "/one", "/two" })
+end
+
+T["icons skip a buffer that was wiped during the request"] = function()
+  local icons = require("wire.ui.icons")
+  local buf = vim.api.nvim_create_buf(true, false)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "### a" })
+  local id = icons.running(buf, 0)
+  vim.api.nvim_buf_delete(buf, { force = true })
+  icons.done(buf, id, { outcome = "ok", tests = {}, response = { status = 200, time = 0 } })
+  icons.running(buf, require("wire.run").mark_row({ buf = buf, mark = 1 }))
 end
 
 T["a throwing post script is a failed test and the run goes on"] = function()

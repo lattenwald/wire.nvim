@@ -87,7 +87,13 @@ local function parse(req, r, out_file)
   local ok, info = pcall(vim.json.decode, r.stdout:sub(1, (nl or 0) - 1))
   local ok2, raw = pcall(vim.json.decode, nl and r.stdout:sub(nl + 1) or "")
   if not (ok and ok2) then
-    return { outcome = "transport_error", error = "unexpected curl output: " .. r.stdout }
+    return {
+      outcome = "transport_error",
+      error = ("unexpected curl output (curl >= %s is required, see :checkhealth wire): %s"):format(
+        require("wire.tools").min.curl,
+        r.stdout
+      ),
+    }
   end
   local headers = {}
   for k, v in pairs(raw) do

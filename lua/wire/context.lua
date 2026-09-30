@@ -53,6 +53,9 @@ M.env = setmetatable({}, {
     end
     error(("unknown name '%s' (variables are vars.%s)"):format(k, k), 2)
   end,
+  __newindex = function(_, k)
+    error(("cannot assign global '%s': use local %s, or vars.%s to keep a value"):format(k, k, k), 2)
+  end,
 })
 
 function M.api()

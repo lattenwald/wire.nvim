@@ -1,5 +1,6 @@
 local report = require("wire.ui.report")
 local run = require("wire.run")
+local tools = require("wire.tools")
 
 local M = {}
 
@@ -32,7 +33,11 @@ local function kind(headers)
 end
 
 local function ensure_jq(res)
-  if res.pretty or res.jq_running or vim.fn.executable("jq") == 0 then
+  if res.pretty or res.jq_running then
+    return
+  end
+  if not tools.usable("jq") then
+    res.pretty = res.response.body
     return
   end
   res.jq_running = true
@@ -176,7 +181,8 @@ end
 function M.push(res)
   table.insert(history, res)
   if #history > HISTORY then
-    table.remove(history, 1)
+    local old = table.remove(history, 1)
+    run.forget(old.buf, old.mark)
   end
   viewed = #history
 end

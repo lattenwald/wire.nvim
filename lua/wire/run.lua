@@ -30,6 +30,12 @@ function M.mark_row(res)
   end
 end
 
+function M.forget(buf, mark)
+  if mark and vim.api.nvim_buf_is_valid(buf) then
+    vim.api.nvim_buf_del_extmark(buf, M.ns, mark)
+  end
+end
+
 function M.response_head(r)
   local names = vim.tbl_keys(r.headers)
   table.sort(names)
@@ -38,6 +44,13 @@ function M.response_head(r)
     out[#out + 1] = n .. ": " .. r.headers[n]
   end
   return out
+end
+
+local function hook(run, name, arg)
+  local ok, err = pcall(run.hooks[name], arg)
+  if not ok then
+    vim.notify(("wire: %s hook: %s"):format(name, err), vim.log.levels.ERROR)
+  end
 end
 
 local function first_line(s)
@@ -119,6 +132,7 @@ local function snapshot(buf, which, row)
     env_vars = e.vars or {},
     env_private = e.private or {},
     default_headers = e.default_headers or {},
+    private_headers = e.private_headers or {},
     doc_vars = vars_map(doc.preamble.vars),
     helpers = hs,
     compiled = compiled,
@@ -134,6 +148,9 @@ local function prepare(ctx, snap, sec)
     local value = ctx:render(h.value, { where = where })
     headers[#headers + 1] = { name = h.name, value = value }
     mask.register_header(h.name, value)
+    if h.default and snap.private_headers[h.name] then
+      mask.register(value)
+    end
     if h.name:lower() == "content-type" then
       content_type = value
     end
@@ -225,6 +242,9 @@ end
 
 local function finish(run)
   M.active = nil
+  for i = #run.results + 1, #run.snap.sections do
+    M.forget(run.snap.buf, run.marks[run.snap.sections[i]])
+  end
   local passed, failed, aborted = 0, 0, 0
   for _, r in ipairs(run.results) do
     if r.outcome == "aborted" then
@@ -246,7 +266,7 @@ local function finish(run)
   local bad = failed + aborted > 0
   vim.notify("wire: " .. table.concat(parts, " · "), bad and vim.log.levels.WARN or vim.log.levels.INFO)
   set_quickfix(run)
-  run.hooks.finished(run)
+  hook(run, "finished", run)
 end
 
 local step
@@ -268,7 +288,7 @@ local function record(run, res, stop)
   res.verbose = mask.apply(verbose_text(res))
   res.summary = summary_lines(res, mark_line(res))
   table.insert(run.results, res)
-  run.hooks.result(res)
+  hook(run, "result", res)
   if stop then
     run.stopped = true
   end
@@ -326,7 +346,7 @@ step = function(run)
     tests = {},
     time = os.time(),
   }
-  run.hooks.started(res)
+  hook(run, "started", res)
   ctx:begin_section(vars_map(sec.vars))
   local ok, req = pcall(function()
     for _, s in ipairs(snap.compiled[sec].pre) do

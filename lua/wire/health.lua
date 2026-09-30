@@ -1,20 +1,33 @@
 local project = require("wire.project")
+local tools = require("wire.tools")
 
 local M = {}
 
 function M.check()
   local h = vim.health
   h.start("wire")
-  if vim.fn.executable("curl") == 1 then
-    local out = vim.system({ "curl", "--version" }, { text = true }):wait().stdout or ""
-    h.ok("curl " .. (out:match("^curl (%S+)") or "(unknown version)"))
-  else
+  local curl = tools.version("curl")
+  curl = curl and tostring(curl)
+  if not curl then
     h.error("curl not found")
-  end
-  if vim.fn.executable("jq") == 1 then
-    h.ok("jq found")
+  elseif tools.usable("curl") then
+    h.ok("curl " .. curl)
   else
+    h.error(("curl %s is older than %s: every send fails"):format(curl, tools.min.curl))
+  end
+  local jq = tools.version("jq")
+  jq = jq and tostring(jq)
+  if not jq then
     h.warn("jq not found: JSON bodies are shown as received")
+  elseif tools.usable("jq") then
+    h.ok("jq " .. jq)
+  else
+    h.warn(
+      ("jq %s is older than %s, which rounds large integers: JSON bodies are shown as received"):format(
+        jq,
+        tools.min.jq
+      )
+    )
   end
   if vim.treesitter.language.add("json") then
     h.ok("json tree-sitter parser found")

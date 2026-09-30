@@ -39,6 +39,14 @@ T["the memo is per section and cleared when a script sets a variable"] = functio
   eq(c:render("{{label}}"), "3:us")
 end
 
+T["a script cannot assign a global that later code would see"] = function()
+  local c = ctx({ helpers = { file = "helper" } })
+  local ok, err = pcall(c.call, c, load("file = 'stale'", "=s", "t", require("wire.context").env))
+  eq(ok, false)
+  eq(err:match("cannot assign global 'file'") ~= nil, true)
+  eq(c:eval("file", "e"), "helper")
+end
+
 T["section, script, document, environment, process env, in that order"] = function()
   vim.env.WIRE_T_X = "process"
   local script_vars = { WIRE_T_X = "script" }

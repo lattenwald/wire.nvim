@@ -17,7 +17,16 @@ function M.setup(opts)
   local highlight = require("wire.highlight")
   highlight.setup()
   local group = vim.api.nvim_create_augroup("wire", { clear = true })
-  project.setup_auto_trust(group)
+  local env = require("wire.env")
+  project.setup_auto_trust(group, function(path)
+    local root = vim.fs.dirname(path)
+    if path:match("%.env%.json$") and env.loaded(root) then
+      local ok, envs, untrusted = pcall(env.load, root)
+      if ok and #untrusted == 0 then
+        env.remember(root, envs)
+      end
+    end
+  end)
   local function attach(buf)
     if vim.bo[buf].filetype == "http" and vim.bo[buf].buftype == "" then
       project.refresh(buf)
@@ -36,7 +45,7 @@ function M.setup(opts)
       attach(buf)
     end
   end
-  require("wire.env").load_state()
+  env.load_state()
 end
 
 local function hooks()
@@ -127,7 +136,7 @@ end
 
 function M.env()
   local root = require("wire.project").cached_project(vim.api.nvim_get_current_buf())
-  return root and require("wire.env").selected(root) or nil
+  return root and require("wire.env").cached_name(root) or nil
 end
 
 function M.ctx()

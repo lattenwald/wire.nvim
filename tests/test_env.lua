@@ -66,15 +66,24 @@ T["the nearest directory with any project file is the root"] = function()
   eq(project.find_root(root .. "/sub"), root .. "/sub")
 end
 
-T["saving a project file from Neovim trusts it"] = function()
-  local root = H.tmpdir()
-  local path = H.write(root .. "/http-client.lua", "return {}\n")
+local function save_in_nvim(path, line)
   project.setup_auto_trust(vim.api.nvim_create_augroup("wire_test_trust", {}))
   vim.cmd.edit(path)
-  vim.api.nvim_buf_set_lines(0, 0, -1, false, { "return { v = 1 }" })
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, { line })
   vim.cmd.write()
-  eq(project.read_trusted(path), "return { v = 1 }\n")
   vim.cmd.bwipeout()
+end
+
+T["saving a project file from Neovim trusts it"] = function()
+  local path = H.write(H.tmpdir() .. "/http-client.lua", "return {}\n")
+  save_in_nvim(path, "return { v = 1 }")
+  eq(project.read_trusted(path), "return { v = 1 }\n")
+end
+
+T["saving a project file read without a final newline trusts it"] = function()
+  local path = H.write(H.tmpdir() .. "/http-client.env.json", "{}")
+  save_in_nvim(path, [[{ "dev": {} }]])
+  eq(project.read_trusted(path), '{ "dev": {} }\n')
 end
 
 return T

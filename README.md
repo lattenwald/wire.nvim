@@ -11,7 +11,8 @@ scratchpad, environments, and Lua scripting with tests. The design is in
 
 Optional:
 
-- `jq`: JSON bodies are pretty-printed with their key order kept.
+- `jq` ≥ 1.7: JSON bodies are pretty-printed with their key order kept. Older jq rounds
+  large integers, so wire shows the body as received.
 - the `json` tree-sitter parser: JSON bodies are highlighted. wire highlights `.http`
   buffers itself and stops tree-sitter's `http` highlighter there.
 - a markdown renderer such as

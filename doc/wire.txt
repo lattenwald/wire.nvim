@@ -27,8 +27,9 @@ cursor or the whole file, with variables, environments, Lua expressions and
 Lua test scripts. Responses open in a split with tabs for the body, headers,
 the request as sent, script output and a per-run report.
 
-Requirements: Neovim >= 0.12 and `curl` >= 7.83. Optional: `jq` (JSON
-pretty-printing, key order kept), the `json` tree-sitter parser (JSON body
+Requirements: Neovim >= 0.12 and `curl` >= 7.83. Optional: `jq` >= 1.7 (JSON
+pretty-printing, key order kept; older jq rounds large integers, so wire
+shows the body as received), the `json` tree-sitter parser (JSON body
 highlighting) and a markdown renderer such as render-markdown.nvim (draws
 the Report tab's table; without one it reads as aligned plain text). Run
 |:checkhealth| wire to check them.
@@ -177,7 +178,8 @@ string.
 - Evaluation is lazy: an expression in a variable runs only if the request
   being sent uses that variable.
 - Variables are `vars.NAME`, never bare names. An unknown bare name raises
-  "unknown name 'X' (variables are vars.X)".
+  "unknown name 'X' (variables are vars.X)", and assigning a bare name (a
+  global) is an error: use `local`, or `vars.X` to keep the value.
 
 Names available everywhere (expressions, scripts, helpers):
 
@@ -343,7 +345,8 @@ and notifications. Response bodies and headers are shown as received.
 
 Registered as secrets, for the whole session:
 - values passed to `secret(s)`;
-- every variable defined in `http-client.private.env.json`;
+- every variable and `$defaultHeaders` value defined in
+  `http-client.private.env.json`;
 - the values of `Authorization`, `Proxy-Authorization`, `Cookie`,
   `X-Api-Key` and `Api-Key`, and the credential after `Bearer`/`Basic`.
 
@@ -409,10 +412,11 @@ Groups, linked by default to standard captures; override with
   WireError         rejected lines            `DiagnosticUnderlineError`
 
 The body is highlighted as JSON by the same rule a send uses
-(|wire-json|). The environment's `$defaultHeaders` count once a send or
-|:Wire| env in that project has read them; until then only the section's
-own headers do. A templated Content-Type is not evaluated for colouring; the
-body's first character decides.
+(|wire-json|). The environment's `$defaultHeaders` count once a send,
+|:Wire| env or saving an env file in that project has read them; until then
+only the section's own headers do. Saving an env file re-reads it only in a
+project already read this session. A templated Content-Type is not evaluated
+for colouring; the body's first character decides.
 
 ==============================================================================
 15. LUA API                                                         *wire-api*
@@ -422,8 +426,10 @@ body's first character decides.
   setup(opts)      See |wire-options|.
   send()           Same as |:Wire| send; `send_all()`, `cancel()`, `open()`,
                    `reset()`, `select_env()` and `scratchpad()` likewise.
-  env()            The current buffer's environment name, or `nil`. No I/O,
-                   so it suits a statusline.
+  env()            The environment a send from the current buffer would use,
+                   or `nil`, as of the last send, |:Wire| env or env file
+                   save in its project; before those, the stored selection.
+                   No I/O, so it suits a statusline.
   ctx()            During a send, the names of |wire-expressions| for code in
                    a plain Lua module; errors outside a send.
 

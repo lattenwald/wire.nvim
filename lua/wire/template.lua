@@ -75,19 +75,19 @@ end
 
 function M.merge_headers(defaults, own)
   local out, index = {}, {}
-  local function put(name, value)
+  local function put(name, value, default)
     local k = name:lower()
     if index[k] then
-      out[index[k]] = { name = name, value = value }
+      out[index[k]] = { name = name, value = value, default = default }
     else
-      out[#out + 1] = { name = name, value = value }
+      out[#out + 1] = { name = name, value = value, default = default }
       index[k] = #out
     end
   end
   local names = vim.tbl_keys(defaults)
   table.sort(names)
   for _, name in ipairs(names) do
-    put(name, defaults[name])
+    put(name, defaults[name], true)
   end
   for _, h in ipairs(own) do
     put(h.name, h.value)

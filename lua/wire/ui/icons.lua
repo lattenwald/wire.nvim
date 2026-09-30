@@ -3,11 +3,17 @@ local M = {}
 local ns = vim.api.nvim_create_namespace("wire.icons")
 
 function M.running(buf, row)
+  if not row then
+    return
+  end
   vim.api.nvim_buf_clear_namespace(buf, ns, row, row + 1)
   return vim.api.nvim_buf_set_extmark(buf, ns, row, 0, { virt_text = { { "⏳", "Comment" } } })
 end
 
 function M.done(buf, id, res)
+  if not (id and vim.api.nvim_buf_is_valid(buf)) then
+    return
+  end
   local pos = vim.api.nvim_buf_get_extmark_by_id(buf, ns, id, {})
   if not pos[1] then
     return

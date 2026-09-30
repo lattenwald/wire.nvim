@@ -131,7 +131,7 @@ local function parse_section(lines, from, to, sec)
       end
       i = i + 1
     elseif state == "body" then
-      if l:match("^>%s") then
+      if l:match("^>%s") or l:match("^>{%%") then
         state = "post"
       elseif looks_like_request(l) then
         return add_error(sec, i, "put ### before the request")
@@ -169,13 +169,19 @@ local function parse_section(lines, from, to, sec)
   end
 end
 
-function M.parse(lines)
+-- sections share no parse state; the highlighter parses each on its own
+function M.section_starts(lines)
   local starts = {}
   for i, l in ipairs(lines) do
     if l:sub(1, 3) == "###" then
       starts[#starts + 1] = i
     end
   end
+  return starts
+end
+
+function M.parse(lines)
+  local starts = M.section_starts(lines)
   local doc = { preamble = { vars = {}, imports = {}, errors = {} }, sections = {} }
   parse_preamble(lines, (starts[1] or #lines + 1) - 1, doc.preamble)
   for k, s in ipairs(starts) do

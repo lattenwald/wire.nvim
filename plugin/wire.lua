@@ -8,8 +8,10 @@ vim.api.nvim_create_user_command("Wire", function(args)
 end, {
   nargs = "?",
   complete = function(lead)
+    local names = vim.tbl_keys(require("wire").subcommands)
+    table.sort(names)
     return vim.tbl_filter(function(name)
       return vim.startswith(name, lead)
-    end, vim.tbl_keys(require("wire").subcommands))
+    end, names)
   end,
 })

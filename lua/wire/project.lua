@@ -55,12 +55,16 @@ function M.read_trusted(path)
   return content
 end
 
-function M.setup_auto_trust(group)
+function M.setup_auto_trust(group, on_trusted)
   vim.api.nvim_create_autocmd("BufWritePost", {
     group = group,
     pattern = { "http-client.lua", "http-client*.env.json" },
     callback = function(ev)
-      vim.secure.trust({ action = "allow", bufnr = ev.buf })
+      local path = vim.api.nvim_buf_get_name(ev.buf)
+      vim.secure.trust({ action = "allow", path = path })
+      if on_trusted then
+        on_trusted(path)
+      end
     end,
   })
 end

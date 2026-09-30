@@ -71,6 +71,18 @@ function H.server_hooks(on_start)
   }
 end
 
+function H.with_bin(name, script, fn)
+  local dir, path = H.tmpdir(), vim.env.PATH
+  H.write(dir .. "/" .. name, "#!/bin/sh\n" .. script .. "\n")
+  vim.uv.fs_chmod(dir .. "/" .. name, 493)
+  vim.env.PATH = dir .. ":" .. path
+  local ok, err = pcall(fn)
+  vim.env.PATH = path
+  if not ok then
+    error(err, 0)
+  end
+end
+
 function H.ctx(opts)
   opts.script_vars = opts.script_vars or {}
   return require("wire.context").new(opts)
@@ -83,17 +95,22 @@ function H.http_buf(path, lines)
   return buf
 end
 
-function H.run(buf, which, row)
+function H.run(buf, which, row, hooks)
   local results, done = {}, false
-  local run = require("wire.run").start(buf, which, row, {
-    started = function() end,
-    result = function(r)
-      table.insert(results, r)
-    end,
-    finished = function()
-      done = true
-    end,
-  })
+  local run = require("wire.run").start(
+    buf,
+    which,
+    row,
+    vim.tbl_extend("force", {
+      started = function() end,
+      result = function(r)
+        table.insert(results, r)
+      end,
+      finished = function()
+        done = true
+      end,
+    }, hooks or {})
+  )
   if run then
     vim.wait(10000, function()
       return done

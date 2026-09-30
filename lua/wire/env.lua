@@ -91,15 +91,21 @@ function M.load(root)
           vars[k] = scalar(v)
         end
       end
+      local priv_headers = {}
       for _, key in ipairs({ "$shared", name }) do
         local src = private[key]
         if is_object(src) then
           for k in pairs(src) do
             priv[k] = true
           end
+          if is_object(src["$defaultHeaders"]) then
+            for hk in pairs(src["$defaultHeaders"]) do
+              priv_headers[hk] = true
+            end
+          end
         end
       end
-      res.envs[name] = { vars = vars, private = priv, default_headers = headers }
+      res.envs[name] = { vars = vars, private = priv, default_headers = headers, private_headers = priv_headers }
       table.insert(res.names, name)
     end
   end
@@ -151,19 +157,31 @@ function M.select(root, name)
   f:close()
 end
 
-local defaults = {}
+local remembered = {}
 
 function M.remember(root, envs)
   local name = M.current(root, envs.names)
   local headers = name and envs.envs[name].default_headers or {}
-  if not vim.deep_equal(defaults[root], headers) then
-    defaults[root] = headers
+  local changed = not (remembered[root] and vim.deep_equal(remembered[root].headers, headers))
+  remembered[root] = { name = name, headers = headers }
+  if changed then
     vim.api.nvim_exec_autocmds("User", { pattern = "WireEnvChanged", data = { root = root } })
   end
 end
 
+function M.loaded(root)
+  return remembered[root] ~= nil
+end
+
 function M.cached_defaults(root)
-  return defaults[root]
+  return remembered[root] and remembered[root].headers
+end
+
+function M.cached_name(root)
+  if not remembered[root] then
+    return M.selected(root)
+  end
+  return remembered[root].name
 end
 
 return M
