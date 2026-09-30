@@ -26,9 +26,15 @@ function M.render(ctx, text, opts)
   opts = opts or {}
   local where = opts.where or "template"
   local out, pos, st = {}, 1, { in_str = false, esc = false }
+  local ps, pe, name, es
   while true do
-    local ps, pe, name = text:find(PLACEHOLDER, pos)
-    local es = text:find("{%=", pos, true)
+    if ps ~= false and (not ps or ps < pos) then
+      ps, pe, name = text:find(PLACEHOLDER, pos)
+      ps = ps or false
+    end
+    if es ~= false and (not es or es < pos) then
+      es = text:find("{%=", pos, true) or false
+    end
     local s = (es and (not ps or es < ps)) and es or ps
     if not s then
       break
@@ -65,6 +71,28 @@ function M.render(ctx, text, opts)
   end
   out[#out + 1] = text:sub(pos)
   return table.concat(out)
+end
+
+function M.merge_headers(defaults, own)
+  local out, index = {}, {}
+  local function put(name, value)
+    local k = name:lower()
+    if index[k] then
+      out[index[k]] = { name = name, value = value }
+    else
+      out[#out + 1] = { name = name, value = value }
+      index[k] = #out
+    end
+  end
+  local names = vim.tbl_keys(defaults)
+  table.sort(names)
+  for _, name in ipairs(names) do
+    put(name, defaults[name])
+  end
+  for _, h in ipairs(own) do
+    put(h.name, h.value)
+  end
+  return out
 end
 
 function M.is_json(content_type, body)

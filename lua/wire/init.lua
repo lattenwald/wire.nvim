@@ -18,20 +18,22 @@ function M.setup(opts)
   highlight.setup()
   local group = vim.api.nvim_create_augroup("wire", { clear = true })
   project.setup_auto_trust(group)
+  local function attach(buf)
+    if vim.bo[buf].filetype == "http" and vim.bo[buf].buftype == "" then
+      project.refresh(buf)
+      highlight.enable(buf)
+    end
+  end
   vim.api.nvim_create_autocmd("FileType", {
     group = group,
     pattern = "http",
     callback = function(ev)
-      if vim.bo[ev.buf].buftype == "" then
-        project.refresh(ev.buf)
-        highlight.enable(ev.buf)
-      end
+      attach(ev.buf)
     end,
   })
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype == "http" and vim.bo[buf].buftype == "" then
-      project.refresh(buf)
-      highlight.enable(buf)
+    if vim.api.nvim_buf_is_loaded(buf) then
+      attach(buf)
     end
   end
   require("wire.env").load_state()
@@ -40,14 +42,12 @@ end
 local function hooks()
   local icons = require("wire.ui.icons")
   local response = require("wire.ui.response")
-  local ids = {}
   return {
     started = function(res)
-      local pos = vim.api.nvim_buf_get_extmark_by_id(res.buf, require("wire.run").ns, res.mark, {})
-      ids[res.mark] = icons.running(res.buf, pos[1])
+      res.icon = icons.running(res.buf, require("wire.run").mark_row(res))
     end,
     result = function(res)
-      icons.done(res.buf, ids[res.mark], res)
+      icons.done(res.buf, res.icon, res)
       response.push(res)
       response.show_result(res)
     end,

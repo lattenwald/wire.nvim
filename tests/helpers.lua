@@ -55,6 +55,27 @@ function H.server()
   return s
 end
 
+function H.server_hooks(on_start)
+  local s
+  return {
+    pre_once = function()
+      s = H.server()
+      on_start(s)
+    end,
+    pre_case = function()
+      s.clear()
+    end,
+    post_once = function()
+      s.stop()
+    end,
+  }
+end
+
+function H.ctx(opts)
+  opts.script_vars = opts.script_vars or {}
+  return require("wire.context").new(opts)
+end
+
 function H.http_buf(path, lines)
   H.write(path, table.concat(lines, "\n") .. "\n")
   local buf = vim.fn.bufadd(path)

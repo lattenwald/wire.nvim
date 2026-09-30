@@ -8,6 +8,8 @@ local function is_comment(l)
   return l:match("^%s*#") ~= nil or l:match("^%s*//") ~= nil
 end
 
+M.is_comment = is_comment
+
 local function parse_var(l)
   local name, value = l:match("^@([%w_.$-]+)%s*=%s*(.-)%s*$")
   if name then
@@ -51,8 +53,7 @@ local function read_script(lines, i, to)
   return nil, nil, "unclosed {% block"
 end
 
-local function parse_preamble(lines, to, pre)
-  local i = 1
+local function parse_lead(lines, i, to, owner, scripts)
   while i <= to do
     local l = lines[i]
     local var = parse_var(l)
@@ -60,53 +61,45 @@ local function parse_preamble(lines, to, pre)
       i = i + 1
     elseif var then
       var.line = i
-      table.insert(pre.vars, var)
+      table.insert(owner.vars, var)
       i = i + 1
     elseif l:sub(1, 1) == "<" then
       local s, nxt, err = read_script(lines, i, to)
       if not s then
-        return add_error(pre, i, err)
+        return add_error(owner, i, err)
       end
-      table.insert(pre.imports, s)
+      table.insert(scripts, s)
       i = nxt
-    elseif parse_request_line(l) then
-      add_error(pre, i, "put ### before the request")
-      i = i + 1
     else
-      add_error(pre, i, "unexpected line in the preamble")
-      i = i + 1
+      return i
     end
   end
 end
 
-local function parse_head(lines, i, to, sec)
-  while i <= to do
-    local l = lines[i]
-    local var = parse_var(l)
-    if is_blank(l) or is_comment(l) then
-      i = i + 1
-    elseif var then
-      var.line = i
-      table.insert(sec.vars, var)
-      i = i + 1
-    elseif l:sub(1, 1) == "<" then
-      local s, nxt, err = read_script(lines, i, to)
-      if not s then
-        return add_error(sec, i, err)
-      end
-      table.insert(sec.pre, s)
-      i = nxt
-    elseif l:sub(1, 1) == ">" then
-      return add_error(sec, i, "post script before the request line")
-    else
-      local method, url = parse_request_line(l)
-      if not method then
-        return add_error(sec, i, "expected a request line")
-      end
-      sec.request = { method = method, url = url, line = i, headers = {} }
-      return i + 1
-    end
+local function parse_preamble(lines, to, pre)
+  local i = parse_lead(lines, 1, to, pre, pre.imports)
+  while i do
+    local msg = parse_request_line(lines[i]) and "put ### before the request" or "unexpected line in the preamble"
+    add_error(pre, i, msg)
+    i = parse_lead(lines, i + 1, to, pre, pre.imports)
   end
+end
+
+local function parse_head(lines, from, to, sec)
+  local i = parse_lead(lines, from, to, sec, sec.pre)
+  if not i then
+    return
+  end
+  local l = lines[i]
+  if l:sub(1, 1) == ">" then
+    return add_error(sec, i, "post script before the request line")
+  end
+  local method, url = parse_request_line(l)
+  if not method then
+    return add_error(sec, i, "expected a request line")
+  end
+  sec.request = { method = method, url = url, line = i, headers = {} }
+  return i + 1
 end
 
 local function parse_section(lines, from, to, sec)

@@ -11,17 +11,9 @@ local function paths()
 end
 
 local T = MiniTest.new_set({
-  hooks = {
-    pre_once = function()
-      server = H.server()
-    end,
-    pre_case = function()
-      server.clear()
-    end,
-    post_once = function()
-      server.stop()
-    end,
-  },
+  hooks = H.server_hooks(function(s)
+    server = s
+  end),
 })
 
 T["a parse error or a broken script anywhere refuses the whole run"] = function()

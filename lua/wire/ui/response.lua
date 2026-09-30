@@ -1,4 +1,5 @@
 local report = require("wire.ui.report")
+local run = require("wire.run")
 
 local M = {}
 
@@ -14,7 +15,6 @@ local TABS = {
 }
 
 local ns = vim.api.nvim_create_namespace("wire.summary")
-local marks = vim.api.nvim_create_namespace("wire.marks")
 local history, viewed = {}, 0
 local state = { tab = "body" }
 
@@ -69,17 +69,7 @@ local function body_lines(res)
 end
 
 local function header_lines(res)
-  local r = res.response
-  if not r then
-    return {}
-  end
-  local names = vim.tbl_keys(r.headers)
-  table.sort(names)
-  local out = { "HTTP " .. r.status }
-  for _, n in ipairs(names) do
-    out[#out + 1] = n .. ": " .. r.headers[n]
-  end
-  return out
+  return res.response and run.response_head(res.response) or {}
 end
 
 local function output_lines(res)
@@ -110,11 +100,11 @@ local function content(res)
   elseif state.tab == "output" then
     return output_lines(res), "text"
   end
-  local run = vim.tbl_filter(function(r)
+  local same_run = vim.tbl_filter(function(r)
     return r.run == res.run
   end, history)
   local lines
-  lines, state.rows = report.build(run)
+  lines, state.rows = report.build(same_run)
   return lines, "markdown"
 end
 
@@ -126,10 +116,6 @@ local function winbar()
   end
   parts[#parts + 1] = ("%%#TabLineFill#  [%d/%d]"):format(viewed, #history)
   return table.concat(parts)
-end
-
-_G.wire_tab_click = function(i)
-  M.show_tab(TABS[i].id)
 end
 
 local function visible()
@@ -162,9 +148,13 @@ function M.render()
   end)
 end
 
-function M.show_tab(id)
+local function show_tab(id)
   state.tab = id
   M.render()
+end
+
+_G.wire_tab_click = function(i)
+  show_tab(TABS[i].id)
 end
 
 function M.prev()
@@ -191,18 +181,18 @@ function M.push(res)
   viewed = #history
 end
 
-function M.close()
+local function close()
   if visible() then
     vim.api.nvim_win_close(state.win, true)
   end
 end
 
-function M.jump()
+local function jump()
   local r = state.rows and state.rows[vim.api.nvim_win_get_cursor(0)[1]]
-  if not (r and vim.api.nvim_buf_is_valid(r.buf)) then
+  local row = r and run.mark_row(r)
+  if not row then
     return
   end
-  local pos = vim.api.nvim_buf_get_extmark_by_id(r.buf, marks, r.mark, {})
   local win = vim.fn.win_findbuf(r.buf)[1]
   if win then
     vim.api.nvim_set_current_win(win)
@@ -210,10 +200,10 @@ function M.jump()
     vim.cmd.wincmd("p")
     vim.api.nvim_win_set_buf(0, r.buf)
   end
-  vim.api.nvim_win_set_cursor(0, { pos[1] + 1, 0 })
+  vim.api.nvim_win_set_cursor(0, { row + 1, 0 })
 end
 
-function M.yank()
+local function yank()
   local res = history[viewed]
   if not (res and res.request) then
     return
@@ -222,6 +212,8 @@ function M.yank()
   vim.notify("wire: curl command yanked (unmasked)")
 end
 
+local keys_help
+
 local function key_list()
   local list = {}
   for _, t in ipairs(TABS) do
@@ -229,28 +221,22 @@ local function key_list()
       t.key,
       t.label .. " tab",
       function()
-        M.show_tab(t.id)
+        show_tab(t.id)
       end,
     }
   end
   return vim.list_extend(list, {
     { "[", "previous result", M.prev },
     { "]", "next result", M.next },
-    { "<CR>", "jump to the section under the cursor (Report tab)", M.jump },
-    {
-      "<C-c>",
-      "cancel the active run",
-      function()
-        require("wire.run").cancel()
-      end,
-    },
-    { "Y", "yank the request as a curl command (unmasked)", M.yank },
-    { "q", "close the window", M.close },
-    { "g?", "show these keys", M.keys_help },
+    { "<CR>", "jump to the section under the cursor (Report tab)", jump },
+    { "<C-c>", "cancel the active run", run.cancel },
+    { "Y", "yank the request as a curl command (unmasked)", yank },
+    { "q", "close the window", close },
+    { "g?", "show these keys", keys_help },
   })
 end
 
-function M.keys_help()
+keys_help = function()
   local lines = {}
   for _, k in ipairs(key_list()) do
     lines[#lines + 1] = (" %-6s %s "):format(k[1], k[2])
@@ -274,15 +260,15 @@ function M.keys_help()
     title = " wire keys ",
     title_pos = "center",
   })
-  local function close()
+  local function close_help()
     if vim.api.nvim_win_is_valid(win) then
       vim.api.nvim_win_close(win, true)
     end
   end
   for _, lhs in ipairs({ "q", "<Esc>", "g?" }) do
-    vim.keymap.set("n", lhs, close, { buffer = buf, nowait = true, silent = true })
+    vim.keymap.set("n", lhs, close_help, { buffer = buf, nowait = true, silent = true })
   end
-  vim.api.nvim_create_autocmd("WinLeave", { buffer = buf, once = true, callback = close })
+  vim.api.nvim_create_autocmd("WinLeave", { buffer = buf, once = true, callback = close_help })
 end
 
 local function set_keys(buf)

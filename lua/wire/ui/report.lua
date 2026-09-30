@@ -1,16 +1,13 @@
-local M = {}
+local run = require("wire.run")
 
-local marks = vim.api.nvim_create_namespace("wire.marks")
+local M = {}
 
 local HEAD = { "", "Line", "Request", "Status", "Time", "Tests" }
 local RIGHT = { false, true, false, false, true, true }
 
 local function line_of(r)
-  if not vim.api.nvim_buf_is_valid(r.buf) then
-    return "?"
-  end
-  local pos = vim.api.nvim_buf_get_extmark_by_id(r.buf, marks, r.mark, {})
-  return pos[1] and tostring(pos[1] + 1) or "?"
+  local row = run.mark_row(r)
+  return row and tostring(row + 1) or "?"
 end
 
 local function cell(s)
@@ -44,29 +41,13 @@ function M.build(results)
     }
     owners[#rows] = r
     for _, t in ipairs(r.tests) do
-      local name = cell(("↳ %s %s"):format(t.ok and "✔" or "✘", t.name)):gsub("\n", "\n    ")
-      rows[#rows + 1] = { "", "", name, "", "", "" }
-      owners[#rows] = r
-    end
-  end
-
-  local physical, physical_owners = {}, {}
-  for i, row in ipairs(rows) do
-    local parts, height = {}, 1
-    for c, v in ipairs(row) do
-      parts[c] = vim.split(v, "\n", { plain = true })
-      height = math.max(height, #parts[c])
-    end
-    for k = 1, height do
-      local line = {}
-      for c = 1, #row do
-        line[c] = parts[c][k] or ""
+      local name = cell(("↳ %s %s"):format(t.ok and "✔" or "✘", t.name))
+      for k, l in ipairs(vim.split(name, "\n", { plain = true })) do
+        rows[#rows + 1] = { "", "", k == 1 and l or ("    " .. l), "", "", "" }
+        owners[#rows] = r
       end
-      physical[#physical + 1] = line
-      physical_owners[#physical] = owners[i]
     end
   end
-  rows, owners = physical, physical_owners
 
   local widths = {}
   for c = 1, #HEAD do

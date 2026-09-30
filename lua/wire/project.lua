@@ -16,7 +16,7 @@ function M.find_root(base_dir)
   return root
 end
 
-function M.base_dir(buf)
+local function buf_base_dir(buf)
   local base = vim.b[buf].wire_base_dir
   if base then
     return base
@@ -26,7 +26,7 @@ function M.base_dir(buf)
 end
 
 function M.refresh(buf)
-  local base = M.base_dir(buf)
+  local base = buf_base_dir(buf)
   local root = M.find_root(base)
   vim.b[buf].wire_project_dir = root or false
   return base, root

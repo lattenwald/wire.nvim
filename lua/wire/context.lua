@@ -1,4 +1,5 @@
 local mask = require("wire.mask")
+local template = require("wire.template")
 
 local M = {}
 
@@ -7,6 +8,11 @@ M.current = nil
 local stores = {}
 
 function M.script_vars(buf)
+  for b in pairs(stores) do
+    if not vim.api.nvim_buf_is_valid(b) then
+      stores[b] = nil
+    end
+  end
   stores[buf] = stores[buf] or {}
   return stores[buf]
 end
@@ -33,7 +39,7 @@ M.env = setmetatable({}, {
       if not c then
         error(("'%s' is only available during a send"):format(k), 2)
       end
-      if POST_ONLY[k] and c.phase ~= "post" then
+      if POST_ONLY[k] and c.api[k] == nil then
         error(("'%s' is only available in post scripts"):format(k), 2)
       end
       return c.api[k]
@@ -60,8 +66,6 @@ function M.api()
   })
 end
 
-local template
-
 local Ctx = {}
 Ctx.__index = Ctx
 
@@ -71,7 +75,6 @@ function M.new(opts)
   self.env_vars = self.env_vars or {}
   self.env_private = self.env_private or {}
   self.helpers = self.helpers or {}
-  self.logs = {}
   self:begin_section({})
   self.api = {
     vars = setmetatable({}, {
@@ -107,11 +110,10 @@ end
 
 function Ctx:begin_section(section_vars)
   self.section_vars = section_vars
-  self.memo, self.stack = {}, {}
+  self.memo, self.stack, self.logs = {}, {}, {}
 end
 
 function Ctx:render(text, opts)
-  template = template or require("wire.template")
   return template.render(self, text, opts)
 end
 

@@ -15,10 +15,10 @@ function M.read_file(path)
   return s
 end
 
-function M.load(content, chunk)
-  local key = chunk .. "\0" .. vim.fn.sha256(content)
-  if cache[key] then
-    return cache[key]
+local function load_helper(content, chunk)
+  local hit = cache[chunk]
+  if hit and hit.content == content then
+    return hit.t
   end
   local fn, err = load(content, chunk, "t", context.env)
   if not fn then
@@ -31,7 +31,7 @@ function M.load(content, chunk)
   if type(t) ~= "table" then
     error(chunk:gsub("^[@=]", "") .. ": a helper file must return a table", 0)
   end
-  cache[key] = t
+  cache[chunk] = { content = content, t = t }
   return t
 end
 
@@ -48,13 +48,13 @@ function M.load_all(opts)
     if not content then
       error(("helper %s: %s"):format(p, err), 0)
     end
-    add(M.load(content, "@" .. p))
+    add(load_helper(content, "@" .. p))
   end
   if opts.root then
     local p = opts.root .. "/http-client.lua"
     local content, why = project.read_trusted(p)
     if content then
-      add(M.load(content, "@" .. p))
+      add(load_helper(content, "@" .. p))
     elseif why == "untrusted" then
       table.insert(untrusted, p)
     end
@@ -68,10 +68,10 @@ function M.load_all(opts)
       elseif not content then
         error(("%s:%d: cannot read %s: %s"):format(opts.file, s.line, p, why), 0)
       else
-        add(M.load(content, "@" .. p))
+        add(load_helper(content, "@" .. p))
       end
     else
-      add(M.load(s.code, ("=%s:%d"):format(opts.file, s.line)))
+      add(load_helper(s.code, ("=%s:%d"):format(opts.file, s.line)))
     end
   end
   return merged, untrusted

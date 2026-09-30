@@ -11,11 +11,15 @@ local function check(what, s)
   end
 end
 
+local function has_body(req)
+  return req.body ~= nil and req.body ~= ""
+end
+
 local function config_lines(req)
   check("URL", req.url)
   local cfg = { "url = " .. quote(req.url), "globoff" }
   if req.method == "HEAD" then
-    if req.body and req.body ~= "" then
+    if has_body(req) then
       error("a HEAD request cannot have a body", 0)
     end
     cfg[#cfg + 1] = "head"
@@ -32,7 +36,7 @@ local function config_lines(req)
     local line = h.value == "" and (h.name .. ":") or (h.name .. ": " .. h.value)
     cfg[#cfg + 1] = "header = " .. quote(line)
   end
-  if req.body and req.body ~= "" and not has_ct then
+  if has_body(req) and not has_ct then
     cfg[#cfg + 1] = 'header = "Content-Type:"' -- drop curl's implicit form content type
   end
   return cfg
@@ -40,7 +44,7 @@ end
 
 function M.build(req, opts)
   local cfg = config_lines(req)
-  if req.body and req.body ~= "" then
+  if has_body(req) then
     cfg[#cfg + 1] = "data-binary = " .. quote("@" .. opts.body_file)
   end
   local argv = {
@@ -64,7 +68,7 @@ end
 
 function M.yank_text(req)
   local cfg = config_lines(req)
-  if req.body and req.body ~= "" then
+  if has_body(req) then
     if req.body:find("%z") then
       cfg[#cfg + 1] = "# binary body omitted"
     else
@@ -103,7 +107,7 @@ end
 function M.send(req, opts, on_done)
   local body_file, out_file = vim.fn.tempname(), vim.fn.tempname()
   local argv, cfg = M.build(req, { timeout = opts.timeout, body_file = body_file, out_file = out_file })
-  if req.body and req.body ~= "" then
+  if has_body(req) then
     local f = assert(io.open(body_file, "wb"))
     f:write(req.body)
     f:close()

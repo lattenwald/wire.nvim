@@ -67,9 +67,10 @@ function M.classify(lines, defaults)
       if not s then
         break
       end
-      local inside = vim.iter(exprs):any(function(r)
-        return s >= r[1] and s <= r[2]
-      end)
+      local inside = false
+      for _, r in ipairs(exprs) do
+        inside = inside or (s >= r[1] and s <= r[2])
+      end
       if not inside then
         add(n, s - 1, e, "WirePlaceholder", INLINE)
       end
@@ -139,12 +140,6 @@ function M.classify(lines, defaults)
         inline(n, 0)
       end
     end
-    local content_type
-    for name, value in pairs(defaults or {}) do
-      if name:lower() == "content-type" then
-        content_type = value
-      end
-    end
     for _, h in ipairs(req.headers) do
       local hl = lines[h.line]
       local colon = hl:find(":", #h.name + 1, true)
@@ -156,11 +151,14 @@ function M.classify(lines, defaults)
       end
       inline(h.line, colon)
       taken[h.line] = true
-      if h.name:lower() == "content-type" then
-        content_type = h.value
-      end
     end
     if req.body then
+      local content_type
+      for _, h in ipairs(template.merge_headers(defaults or {}, req.headers)) do
+        if h.name:lower() == "content-type" then
+          content_type = h.value
+        end
+      end
       local count = select(2, req.body:gsub("\n", "")) + 1
       for n = req.body_line, req.body_line + count - 1 do
         inline(n, 0)
@@ -207,20 +205,14 @@ function M.classify(lines, defaults)
     errors(sec)
   end
   for n, l in ipairs(lines) do
-    if not taken[n] and (l:match("^%s*#") or l:match("^%s*//")) then
+    if not taken[n] and document.is_comment(l) then
       add(n, 0, #l, "WireComment", BASE)
     end
   end
   return spans, regions
 end
 
-local cache, cache_size = {}, 0
-
 local function captures(lang, text)
-  local key = lang .. "\0" .. text
-  if cache[key] then
-    return cache[key]
-  end
   local out = {}
   local ok, added = pcall(vim.treesitter.language.add, lang)
   local query = ok and added and vim.treesitter.query.get(lang, "highlights")
@@ -235,17 +227,17 @@ local function captures(lang, text)
       end
     end
   end
-  if cache_size > 500 then
-    cache, cache_size = {}, 0
-  end
-  cache[key], cache_size = out, cache_size + 1
   return out
 end
 
-function M.spans(lines, defaults)
+function M.spans(lines, defaults, prev)
+  prev = prev or {}
   local spans, regions = M.classify(lines, defaults)
+  local used = {}
   for _, r in ipairs(regions) do
-    for _, c in ipairs(captures(r.lang, r.text)) do
+    local key = r.lang .. "\0" .. r.text
+    used[key] = used[key] or prev[key] or captures(r.lang, r.text)
+    for _, c in ipairs(used[key]) do
       spans[#spans + 1] = {
         row = r.row + c[1],
         col = c[2] + (c[1] == 0 and r.col or 0),
@@ -256,8 +248,10 @@ function M.spans(lines, defaults)
       }
     end
   end
-  return spans
+  return spans, used
 end
+
+local captured = {}
 
 local function refresh(buf)
   if not vim.api.nvim_buf_is_valid(buf) then
@@ -265,11 +259,14 @@ local function refresh(buf)
   end
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
   if vim.bo[buf].filetype ~= "http" then
+    captured[buf] = nil
     return
   end
   local root = project.cached_project(buf)
   local defaults = root and env.cached_defaults(root)
-  for _, s in ipairs(M.spans(vim.api.nvim_buf_get_lines(buf, 0, -1, false), defaults)) do
+  local spans
+  spans, captured[buf] = M.spans(vim.api.nvim_buf_get_lines(buf, 0, -1, false), defaults, captured[buf])
+  for _, s in ipairs(spans) do
     pcall(vim.api.nvim_buf_set_extmark, buf, ns, s.row, s.col, {
       end_row = s.end_row,
       end_col = s.end_col,
@@ -305,7 +302,7 @@ function M.enable(buf)
     on_lines = schedule,
     on_reload = schedule,
     on_detach = function()
-      attached[buf] = nil
+      attached[buf], captured[buf] = nil, nil
     end,
   })
   refresh(buf)

@@ -1,11 +1,8 @@
-local context = require("wire.context")
+local H = require("tests.helpers")
 local template = require("wire.template")
 local eq = MiniTest.expect.equality
 
-local function ctx(opts)
-  opts.script_vars = opts.script_vars or {}
-  return context.new(opts)
-end
+local ctx = H.ctx
 
 local T = MiniTest.new_set()
 

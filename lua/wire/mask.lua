@@ -13,7 +13,7 @@ local AUTO = {
 local values, sorted = {}, nil
 
 local function add(v)
-  if type(v) == "string" and #v >= MIN and not values[v] then
+  if not values[v] then
     values[v] = true
     sorted = nil
   end
@@ -41,21 +41,6 @@ function M.register_header(name, value)
   end
 end
 
-local function replace_plain(s, needle)
-  local out, pos = {}, 1
-  while true do
-    local a, b = s:find(needle, pos, true)
-    if not a then
-      break
-    end
-    out[#out + 1] = s:sub(pos, a - 1)
-    out[#out + 1] = MASK
-    pos = b + 1
-  end
-  out[#out + 1] = s:sub(pos)
-  return table.concat(out)
-end
-
 function M.apply(s)
   if not sorted then
     sorted = vim.tbl_keys(values)
@@ -64,7 +49,9 @@ function M.apply(s)
     end)
   end
   for _, v in ipairs(sorted) do
-    s = replace_plain(s, v)
+    if s:find(v, 1, true) then
+      s = s:gsub(vim.pesc(v), MASK)
+    end
   end
   return s
 end

@@ -24,11 +24,27 @@ local function vars_map(list)
   return m
 end
 
+function M.mark_row(res)
+  if vim.api.nvim_buf_is_valid(res.buf) then
+    return vim.api.nvim_buf_get_extmark_by_id(res.buf, M.ns, res.mark, {})[1]
+  end
+end
+
+function M.response_head(r)
+  local names = vim.tbl_keys(r.headers)
+  table.sort(names)
+  local out = { "HTTP " .. r.status }
+  for _, n in ipairs(names) do
+    out[#out + 1] = n .. ": " .. r.headers[n]
+  end
+  return out
+end
+
 local function first_line(s)
   return (s:match("^[^\n]*"))
 end
 
-function M.snapshot(buf, which, row)
+local function snapshot(buf, which, row)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local file = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":t")
   local doc = document.parse(lines)
@@ -97,8 +113,6 @@ function M.snapshot(buf, which, row)
     file = file,
     sections = sections,
     base_dir = base,
-    root = root,
-    env_name = env_name,
     env_unselected = env_name == nil and #envs.names > 0,
     env_warnings = envs.warnings,
     env_label = env_name or (root and "none" or "no project"),
@@ -111,34 +125,12 @@ function M.snapshot(buf, which, row)
   }
 end
 
-local function merged_header_templates(defaults, own)
-  local out, index = {}, {}
-  local function put(name, value)
-    local k = name:lower()
-    if index[k] then
-      out[index[k]] = { name = name, value = value }
-    else
-      out[#out + 1] = { name = name, value = value }
-      index[k] = #out
-    end
-  end
-  local names = vim.tbl_keys(defaults)
-  table.sort(names)
-  for _, name in ipairs(names) do
-    put(name, defaults[name])
-  end
-  for _, h in ipairs(own) do
-    put(h.name, h.value)
-  end
-  return out
-end
-
-function M.prepare(ctx, snap, sec)
+local function prepare(ctx, snap, sec)
   local req = sec.request
   local where = ("%s:%d"):format(snap.file, req.line)
   local url = ctx:render(req.url, { where = where })
   local headers, content_type = {}, nil
-  for _, h in ipairs(merged_header_templates(snap.default_headers, req.headers)) do
+  for _, h in ipairs(template.merge_headers(snap.default_headers, req.headers)) do
     local value = ctx:render(h.value, { where = where })
     headers[#headers + 1] = { name = h.name, value = value }
     mask.register_header(h.name, value)
@@ -153,7 +145,7 @@ function M.prepare(ctx, snap, sec)
   return { name = sec.name, method = req.method, url = url, headers = headers, body = body }
 end
 
-function M.verbose_text(res)
+local function verbose_text(res)
   local l = {}
   local q = res.request
   if q then
@@ -169,12 +161,7 @@ function M.verbose_text(res)
   local r = res.response
   if r then
     l[#l + 1] = ""
-    l[#l + 1] = "HTTP " .. r.status
-    local names = vim.tbl_keys(r.headers)
-    table.sort(names)
-    for _, n in ipairs(names) do
-      l[#l + 1] = n .. ": " .. r.headers[n]
-    end
+    vim.list_extend(l, M.response_head(r))
   end
   if res.error then
     l[#l + 1] = ""
@@ -206,11 +193,12 @@ local function summary_lines(res, line)
 end
 
 local function mark_line(res)
-  local pos = vim.api.nvim_buf_get_extmark_by_id(res.buf, M.ns, res.mark, {})
-  return (pos[1] or 0) + 1
+  return (M.mark_row(res) or 0) + 1
 end
 
-function M.set_quickfix(run)
+local qf_id
+
+local function set_quickfix(run)
   local items = {}
   for _, r in ipairs(run.results) do
     if r.failed then
@@ -227,30 +215,27 @@ function M.set_quickfix(run)
       items[#items + 1] = { bufnr = r.buf, lnum = mark_line(r), text = r.section_name .. ": " .. first_line(why) }
     end
   end
-  if M.qf_id and vim.fn.getqflist({ id = M.qf_id }).id == M.qf_id then
-    vim.fn.setqflist({}, "r", { id = M.qf_id, items = items, title = "wire" })
+  if qf_id and vim.fn.getqflist({ id = qf_id }).id == qf_id then
+    vim.fn.setqflist({}, "r", { id = qf_id, items = items, title = "wire" })
   else
     vim.fn.setqflist({}, " ", { items = items, title = "wire" })
-    M.qf_id = vim.fn.getqflist({ id = 0 }).id
+    qf_id = vim.fn.getqflist({ id = 0 }).id
   end
 end
 
 local function finish(run)
   M.active = nil
-  local sent, passed, failed, aborted = 0, 0, 0, 0
+  local passed, failed, aborted = 0, 0, 0
   for _, r in ipairs(run.results) do
     if r.outcome == "aborted" then
       aborted = aborted + 1
+    elseif r.failed then
+      failed = failed + 1
     else
-      sent = sent + 1
-      if r.failed then
-        failed = failed + 1
-      else
-        passed = passed + 1
-      end
+      passed = passed + 1
     end
   end
-  local parts = { sent .. " sent", passed .. " ✓", failed .. " ✗" }
+  local parts = { (passed + failed) .. " sent", passed .. " ✓", failed .. " ✗" }
   if aborted > 0 then
     parts[#parts + 1] = aborted .. " aborted"
   end
@@ -260,7 +245,7 @@ local function finish(run)
   end
   local bad = failed + aborted > 0
   vim.notify("wire: " .. table.concat(parts, " · "), bad and vim.log.levels.WARN or vim.log.levels.INFO)
-  M.set_quickfix(run)
+  set_quickfix(run)
   run.hooks.finished(run)
 end
 
@@ -280,7 +265,7 @@ local function record(run, res, stop)
   res.failed = res.outcome ~= "ok" or vim.iter(res.tests):any(function(t)
     return not t.ok
   end)
-  res.verbose = mask.apply(M.verbose_text(res))
+  res.verbose = mask.apply(verbose_text(res))
   res.summary = summary_lines(res, mark_line(res))
   table.insert(run.results, res)
   run.hooks.result(res)
@@ -292,14 +277,23 @@ end
 
 local function post(run, sec, res)
   local ctx, r = run.ctx, res.response
-  local ok, json = pcall(vim.json.decode, r.body, { luanil = { object = true, array = true } })
   local req_headers = {}
   for _, h in ipairs(res.request.headers) do
     req_headers[h.name:lower()] = h.value
   end
-  ctx.phase = "post"
   ctx.api.request = vim.tbl_extend("force", res.request, { headers = req_headers })
-  ctx.api.response = { status = r.status, headers = r.headers, body = r.body, json = ok and json or nil }
+  local decoded
+  ctx.api.response = setmetatable({ status = r.status, headers = r.headers, body = r.body }, {
+    __index = function(_, k)
+      if k == "json" then
+        if not decoded then
+          local ok, json = pcall(vim.json.decode, r.body, { luanil = { object = true, array = true } })
+          decoded = { ok and json or nil }
+        end
+        return decoded[1]
+      end
+    end,
+  })
   ctx.api.test = function(name, fn)
     script.run_test(res.tests, name, fn)
   end
@@ -309,7 +303,6 @@ local function post(run, sec, res)
       table.insert(res.tests, { name = s.name, ok = false, messages = { err }, script_error = true })
     end
   end
-  ctx.phase = nil
   ctx.api.request, ctx.api.response, ctx.api.test = nil, nil, nil
 end
 
@@ -335,15 +328,12 @@ step = function(run)
   }
   run.hooks.started(res)
   ctx:begin_section(vars_map(sec.vars))
-  ctx.logs = {}
-  ctx.phase = "pre"
   local ok, req = pcall(function()
     for _, s in ipairs(snap.compiled[sec].pre) do
       ctx:call(s.fn)
     end
-    return M.prepare(ctx, snap, sec)
+    return prepare(ctx, snap, sec)
   end)
-  ctx.phase = nil
   if not ok then
     res.outcome, res.error = "aborted", req
     return record(run, res, true)
@@ -372,7 +362,7 @@ function M.start(buf, which, row, hooks)
     vim.notify("wire: a run is already active", vim.log.levels.WARN)
     return
   end
-  local ok, snap = pcall(M.snapshot, buf, which, row)
+  local ok, snap = pcall(snapshot, buf, which, row)
   if not ok then
     vim.notify("wire: " .. mask.apply(snap), vim.log.levels.ERROR)
     return

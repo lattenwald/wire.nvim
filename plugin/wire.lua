@@ -9,7 +9,7 @@ end, {
   nargs = "?",
   complete = function(lead)
     return vim.tbl_filter(function(name)
-      return name:sub(1, #lead) == lead
+      return vim.startswith(name, lead)
     end, vim.tbl_keys(require("wire").subcommands))
   end,
 })
