@@ -1,3 +1,4 @@
+local H = require("tests.helpers")
 local highlight = require("wire.highlight")
 local eq = MiniTest.expect.equality
 
@@ -76,8 +77,18 @@ T["a templated Content-Type is not trusted; the body decides"] = function()
   eq(#regions, 1)
 end
 
-local function marks(buf)
-  return vim.api.nvim_buf_get_extmarks(buf, vim.api.nvim_create_namespace("wire.highlight"), 0, -1, {})
+local function groups(buf, row)
+  return vim.tbl_map(function(p)
+    return p.group
+  end, highlight.drawn(buf, row) or {})
+end
+
+local function scratch_http(lines)
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.bo[buf].filetype = "http"
+  highlight.enable(buf)
+  return buf
 end
 
 T["a special buffer with filetype http, like the Headers tab, is left alone"] = function()
@@ -85,19 +96,62 @@ T["a special buffer with filetype http, like the Headers tab, is left alone"] = 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "HTTP 200", "content-type: application/json" })
   vim.bo[buf].filetype = "http"
-  vim.wait(100)
-  eq(marks(buf), {})
+  eq(highlight.drawn(buf, 1), nil)
 end
 
-T["highlights are cleared once the buffer's filetype is no longer http"] = function()
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "### a", "GET http://h/x" })
-  vim.bo[buf].filetype = "http"
-  highlight.enable(buf)
+T["nothing is drawn once the buffer's filetype is no longer http"] = function()
+  local buf = scratch_http({ "### a", "GET http://h/x" })
+  eq(groups(buf, 0), { "WireSeparator" })
   vim.bo[buf].filetype = "json"
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "{", '  "a": 1', "}" })
-  vim.wait(100)
-  eq(marks(buf), {})
+  eq(highlight.drawn(buf, 0), nil)
+end
+
+T["sections keep their colours when lines are inserted above them"] = function()
+  local buf = scratch_http({ "### a", "GET http://h/a", "### b", "GET http://h/b" })
+  eq(groups(buf, 2), { "WireSeparator" })
+  vim.api.nvim_buf_set_lines(buf, 0, 0, false, { "# one", "# two" })
+  eq(highlight.drawn(buf, 2), { { col = 0, end_row = 2, end_col = 5, group = "WireSeparator", priority = 100 } })
+  eq(groups(buf, 4), { "WireSeparator" })
+  eq(vim.list_contains(groups(buf, 5), "WireMethod"), true)
+end
+
+T["a span over several lines is drawn on each of them"] = function()
+  local buf = scratch_http({ "### a", "GET http://h/a", "", "> {%", "--[[ one", "two", "three ]]", "%}" })
+  local function comment(row)
+    return vim.tbl_filter(function(p)
+      return p.group == "@comment.lua"
+    end, highlight.drawn(buf, row))[1]
+  end
+  eq({ comment(4).col, comment(4).end_row, comment(4).end_col }, { 0, 5, 0 })
+  eq({ comment(5).col, comment(5).end_row, comment(5).end_col }, { 0, 6, 0 })
+  eq({ comment(6).col, comment(6).end_row, comment(6).end_col }, { 0, 6, 8 })
+end
+
+T["an edit recolours the rest of its section"] = function()
+  local buf = scratch_http({ "### a", "not a request", "Accept: x" })
+  eq(groups(buf, 2), {})
+  vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "GET http://h/a" })
+  eq(vim.list_contains(groups(buf, 2), "WireHeader"), true)
+end
+
+T["remembered environment defaults reach the next draw"] = function()
+  require("wire").setup({})
+  local root = H.tmpdir()
+  local buf = scratch_http({ "### a", "POST http://h/a", "", '"{{payload}}"' })
+  vim.b[buf].wire_project_dir = root
+  local spans, seen = highlight.spans, nil
+  highlight.spans = function(lines, defaults)
+    seen = defaults
+    return spans(lines, defaults)
+  end
+  highlight.drawn(buf, 3)
+  require("wire.env").remember(root, {
+    names = { "dev" },
+    envs = { dev = { default_headers = { ["Content-Type"] = "application/json" } } },
+  })
+  highlight.drawn(buf, 3)
+  highlight.spans = spans
+  eq(seen, { ["Content-Type"] = "application/json" })
 end
 
 return T

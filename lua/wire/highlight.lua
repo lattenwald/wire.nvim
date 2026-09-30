@@ -230,14 +230,10 @@ local function captures(lang, text)
   return out
 end
 
-function M.spans(lines, defaults, prev)
-  prev = prev or {}
+function M.spans(lines, defaults)
   local spans, regions = M.classify(lines, defaults)
-  local used = {}
   for _, r in ipairs(regions) do
-    local key = r.lang .. "\0" .. r.text
-    used[key] = used[key] or prev[key] or captures(r.lang, r.text)
-    for _, c in ipairs(used[key]) do
+    for _, c in ipairs(captures(r.lang, r.text)) do
       spans[#spans + 1] = {
         row = r.row + c[1],
         col = c[2] + (c[1] == 0 and r.col or 0),
@@ -248,35 +244,96 @@ function M.spans(lines, defaults, prev)
       }
     end
   end
-  return spans, used
+  return spans
 end
 
-local captured = {}
+-- on_line draws one row at a time
+local function by_row(spans)
+  local rows = {}
+  local function put(row, col, down, end_col, s)
+    rows[row] = rows[row] or {}
+    table.insert(rows[row], { col = col, down = down, end_col = end_col, group = s.group, priority = s.priority })
+  end
+  for _, s in ipairs(spans) do
+    if s.end_row == s.row then
+      put(s.row, s.col, 0, s.end_col, s)
+    else
+      put(s.row, s.col, 1, 0, s)
+      for r = s.row + 1, s.end_row - 1 do
+        put(r, 0, 1, 0, s)
+      end
+      if s.end_col > 0 then
+        put(s.end_row, 0, 0, s.end_col, s)
+      end
+    end
+  end
+  return rows
+end
 
-local function refresh(buf)
-  if not vim.api.nvim_buf_is_valid(buf) then
+local state = {}
+
+local function update(buf, st)
+  local tick = vim.api.nvim_buf_get_changedtick(buf)
+  if st.tick == tick then
     return
   end
-  vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
-  if vim.bo[buf].filetype ~= "http" then
-    captured[buf] = nil
-    return
-  end
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local root = project.cached_project(buf)
   local defaults = root and env.cached_defaults(root)
-  local spans
-  spans, captured[buf] = M.spans(vim.api.nvim_buf_get_lines(buf, 0, -1, false), defaults, captured[buf])
-  for _, s in ipairs(spans) do
-    pcall(vim.api.nvim_buf_set_extmark, buf, ns, s.row, s.col, {
-      end_row = s.end_row,
-      end_col = s.end_col,
-      hl_group = s.group,
-      priority = s.priority,
-    })
+  local starts = document.section_starts(lines)
+  if starts[1] ~= 1 then
+    table.insert(starts, 1, 1)
   end
+  local memo, rows = {}, {}
+  for k, from in ipairs(starts) do
+    local part = vim.list_slice(lines, from, (starts[k + 1] or #lines + 1) - 1)
+    local key = table.concat(part, "\n")
+    memo[key] = memo[key] or st.memo[key] or by_row(M.spans(part, defaults))
+    for r, pieces in pairs(memo[key]) do
+      rows[from - 1 + r] = pieces
+    end
+  end
+  st.tick, st.memo, st.rows = tick, memo, rows
 end
 
-local attached = {}
+local function pieces(buf, row)
+  local st = state[buf]
+  update(buf, st)
+  return st.rows[row] or {}
+end
+
+function M.drawn(buf, row)
+  if not state[buf] or vim.bo[buf].filetype ~= "http" then
+    return nil
+  end
+  return vim.tbl_map(function(p)
+    return { col = p.col, end_row = row + p.down, end_col = p.end_col, group = p.group, priority = p.priority }
+  end, pieces(buf, row))
+end
+
+vim.api.nvim_set_decoration_provider(ns, {
+  on_win = function(_, _, buf)
+    return state[buf] ~= nil and vim.bo[buf].filetype == "http"
+  end,
+  on_line = function(_, _, buf, row)
+    for _, p in ipairs(pieces(buf, row)) do
+      pcall(vim.api.nvim_buf_set_extmark, buf, ns, row, p.col, {
+        end_row = row + p.down,
+        end_col = p.end_col,
+        hl_group = p.group,
+        priority = p.priority,
+        ephemeral = true,
+      })
+    end
+  end,
+})
+
+-- Neovim redraws only edited rows; an edit can recolour the rest of its section
+local function redraw(buf)
+  if vim.api.nvim_buf_is_valid(buf) then
+    vim.api.nvim__redraw({ buf = buf, valid = false })
+  end
+end
 
 function M.enable(buf)
   vim.schedule(function()
@@ -284,28 +341,25 @@ function M.enable(buf)
       vim.treesitter.stop(buf)
     end
   end)
-  if attached[buf] then
-    return refresh(buf)
+  if state[buf] then
+    return
   end
-  attached[buf] = true
+  state[buf] = { memo = {} }
   local pending = false
-  local function schedule()
-    if not pending then
-      pending = true
-      vim.schedule(function()
-        pending = false
-        refresh(buf)
-      end)
-    end
-  end
   vim.api.nvim_buf_attach(buf, false, {
-    on_lines = schedule,
-    on_reload = schedule,
+    on_lines = function()
+      if not pending then
+        pending = true
+        vim.schedule(function()
+          pending = false
+          redraw(buf)
+        end)
+      end
+    end,
     on_detach = function()
-      attached[buf], captured[buf] = nil, nil
+      state[buf] = nil
     end,
   })
-  refresh(buf)
 end
 
 function M.setup()
@@ -316,9 +370,10 @@ function M.setup()
     group = vim.api.nvim_create_augroup("wire.highlight", { clear = true }),
     pattern = "WireEnvChanged",
     callback = function(ev)
-      for buf in pairs(attached) do
+      for buf, st in pairs(state) do
         if project.cached_project(buf) == ev.data.root then
-          refresh(buf)
+          st.tick, st.memo = nil, {}
+          redraw(buf)
         end
       end
     end,
