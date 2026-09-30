@@ -115,7 +115,7 @@ local function content(res)
   end, history)
   local lines
   lines, state.rows = report.build(run)
-  return lines, "text"
+  return lines, "markdown"
 end
 
 local function winbar()
