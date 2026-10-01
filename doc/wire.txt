@@ -68,8 +68,12 @@ With lazy.nvim: >lua
   timeout    Overall limit per request in seconds (curl `--max-time`).
              Default: none; the connect timeout is always 10 s.
   trusted_dirs
-             List of directories whose project files skip |:trust|
-             (|wire-trust|); `{ "/" }` trusts every file. Default: none.
+             List of absolute directories (`~` allowed) whose project files
+             skip |:trust| (|wire-trust|); `{ "/" }` trusts every file.
+             Default: none.
+  mask       `false` to mask nothing, or `{ headers = { Name = bool } }` to
+             change which request headers are masked (|wire-masking|).
+             Default: the headers listed there.
 
 wire defines no global mappings.
 
@@ -360,6 +364,22 @@ Registered as secrets, for the whole session:
 
 Values shorter than 4 characters are never masked. `Y` in the response window
 is the one way to copy unmasked text.
+
+The `mask` option relaxes or extends this. Header names are case-insensitive,
+and only the headers you name change:
+>lua
+    -- show cookies; everything else stays masked
+    require("wire").setup({ mask = { headers = { Cookie = false } } })
+
+    -- also mask a custom auth header
+    require("wire").setup({ mask = { headers = { ["X-Auth-Token"] = true } } })
+
+    -- mask nothing, secret() and private env values included
+    require("wire").setup({ mask = false })
+<
+An unmasked header still hides a secret it carries from another source:
+`Cookie: sid={{sid}}`, with `sid` from the private env file, shows as
+`Cookie: sid=••••`.
 
 ==============================================================================
 13. RESPONSE WINDOW                                            *wire-response*

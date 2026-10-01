@@ -76,7 +76,17 @@ require("wire").setup({
   helpers = {},  -- global helper files, loaded before each project's http-client.lua
   timeout = nil, -- overall limit per request in seconds; nil = none (connect timeout is 10 s)
   trusted_dirs = {}, -- project files under these dirs skip :trust; { "/" } trusts all
+  mask = { headers = { ... } }, -- which request headers are masked; false = mask nothing
 })
+```
+
+Auth headers, cookies, private env values and `secret()` values show as `••••` in
+everything wire displays. To relax that:
+
+```lua
+mask = { headers = { Cookie = false } }          -- show cookies
+mask = { headers = { ["X-Auth-Token"] = true } } -- also mask a custom header
+mask = false                                     -- show everything
 ```
 
 `:Wire send|all|cancel|open|env|scratch|reset`. Statusline: `require("wire").env()`.

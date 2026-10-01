@@ -1,9 +1,19 @@
+local config = require("wire.config")
 local env = require("wire.env")
 local project = require("wire.project")
 local H = require("tests.helpers")
 local eq = MiniTest.expect.equality
 
-local T = MiniTest.new_set()
+local home = vim.env.HOME
+
+local T = MiniTest.new_set({
+  hooks = {
+    post_case = function()
+      vim.env.HOME = home
+      config.setup({})
+    end,
+  },
+})
 
 T["private over public, environment over $shared, $defaultHeaders per header"] = function()
   local root = H.tmpdir()
@@ -59,41 +69,33 @@ T["an untrusted env file contributes nothing"] = function()
   eq(untrusted, { path })
 end
 
-local function with_trusted_dirs(dirs, fn)
-  local config = require("wire.config")
-  config.setup({ trusted_dirs = dirs })
-  local ok, err = pcall(fn)
-  config.setup({})
-  if not ok then
-    error(err, 0)
-  end
-end
-
 T["a sibling sharing a trusted dir's name prefix still needs :trust"] = function()
   local root = H.tmpdir()
   local path = H.write(root .. "-other/http-client.lua", "return {}")
-  with_trusted_dirs({ root }, function()
-    eq({ project.read_trusted(path) }, { nil, "untrusted" })
-  end)
+  config.setup({ trusted_dirs = { root } })
+  eq({ project.read_trusted(path) }, { nil, "untrusted" })
 end
 
 T["trusted_dirs { '/' } trusts every file"] = function()
   local path = H.write(H.tmpdir() .. "/http-client.lua", "return {}")
-  with_trusted_dirs({ "/" }, function()
-    eq(project.read_trusted(path), "return {}")
-  end)
+  config.setup({ trusted_dirs = { "/" } })
+  eq(project.read_trusted(path), "return {}")
 end
 
 T["trusted_dirs expands ~"] = function()
-  local home, saved = H.tmpdir(), vim.env.HOME
-  local path = H.write(home .. "/p/http-client.lua", "return {}")
-  vim.env.HOME = home
-  local ok, err = pcall(with_trusted_dirs, { "~/p/" }, function()
-    eq(project.read_trusted(path), "return {}")
-  end)
-  vim.env.HOME = saved
-  if not ok then
-    error(err, 0)
+  vim.env.HOME = H.tmpdir()
+  local path = H.write(vim.env.HOME .. "/p/http-client.lua", "return {}")
+  config.setup({ trusted_dirs = { "~/p/" } })
+  eq(project.read_trusted(path), "return {}")
+end
+
+T["an empty or relative trusted_dirs entry fails setup and trusts nothing"] = function()
+  local path = H.write(H.tmpdir() .. "/http-client.lua", "return {}")
+  for _, dir in ipairs({ "", "work" }) do
+    MiniTest.expect.error(function()
+      config.setup({ trusted_dirs = { dir } })
+    end)
+    eq({ project.read_trusted(path) }, { nil, "untrusted" })
   end
 end
 

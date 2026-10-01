@@ -1,14 +1,9 @@
+local config = require("wire.config")
+
 local M = {}
 
 local MIN = 4
 local MASK = "••••"
-local AUTO = {
-  authorization = true,
-  ["proxy-authorization"] = true,
-  cookie = true,
-  ["x-api-key"] = true,
-  ["api-key"] = true,
-}
 
 local values, sorted = {}, nil
 
@@ -32,7 +27,8 @@ end
 
 function M.register_header(name, value)
   local n = name:lower()
-  if not AUTO[n] then
+  local opts = config.options.mask
+  if not (opts and opts.headers[n]) then
     return
   end
   M.register(value)
@@ -42,6 +38,9 @@ function M.register_header(name, value)
 end
 
 function M.apply(s)
+  if not config.options.mask then
+    return s
+  end
   if not sorted then
     sorted = vim.tbl_keys(values)
     table.sort(sorted, function(a, b)

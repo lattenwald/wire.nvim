@@ -5,16 +5,6 @@ local M = {}
 
 local cache = {}
 
-function M.read_file(path)
-  local f, err = io.open(path, "rb")
-  if not f then
-    return nil, err
-  end
-  local s = f:read("*a")
-  f:close()
-  return s
-end
-
 local function load_helper(content, chunk)
   local hit = cache[chunk]
   if hit and hit.content == content then
@@ -44,7 +34,7 @@ function M.load_all(opts)
   end
   for _, p in ipairs(opts.global or {}) do
     p = vim.fs.normalize(p)
-    local content, err = M.read_file(p)
+    local content, err = project.read_file(p)
     if not content then
       error(("helper %s: %s"):format(p, err), 0)
     end

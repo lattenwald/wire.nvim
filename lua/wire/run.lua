@@ -88,7 +88,7 @@ local function snapshot(buf, which, row)
   end
 
   local base, root = project.refresh(buf)
-  local read_import = vim.b[buf].wire_scratch and project.read_trusted or helpers.read_file
+  local read_import = vim.b[buf].wire_scratch and project.read_trusted or project.read_file
   local envs, untrusted = env.load(root)
   local env_name = root and env.current(root, envs.names)
   if root and #untrusted == 0 then

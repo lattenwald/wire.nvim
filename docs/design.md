@@ -310,7 +310,9 @@ Helpers call each other as plain names, can keep module-level state (caches), an
   - wire compiles the string `vim.secure.read` returned, never a second read of the file.
   - **Trusted directories** (opt-in): a discovered file whose normalized path lies under an
     entry of `setup({ trusted_dirs = { … } })` is read directly, with no prompt; `~` is
-    expanded, a match is by whole path components, and `{ "/" }` trusts every file. The
+    expanded, a match is by whole path components, and `{ "/" }` trusts every file.
+    `setup()` rejects an entry that is not absolute once `~` is expanded, so an empty one
+    (`vim.env.WORK or ""`) cannot fail open by matching every path. The
     gate exists for cloned and pulled code, so the option is honoured only from `setup()`
     and never from project files. Prior art: mise `trusted_config_paths`, direnv's
     whitelist prefix, VS Code trusted folders.
@@ -461,6 +463,17 @@ default header keeps working.
     `Cookie`, `X-Api-Key` and `Api-Key`, after `$defaultHeaders` are merged. For the two
     `Authorization` headers, the credential after the scheme word (`Bearer`, `Basic`) is
     registered as well, so a bare token is masked too.
+- `setup({ mask = … })` (§10) adjusts this for developers who need to see the values:
+  - `mask.headers` maps header names (case-insensitive, lowercased before the merge with
+    the defaults) to booleans: `false` stops registering that header, `true` adds one.
+    A header rule only decides whether the header's own value is registered; a secret from
+    another source inside it stays masked (`Cookie: sid=••••` for a private `sid`).
+  - `mask = false` turns masking off: `apply` returns text unchanged, registered values
+    included. `mask = true` means the default. `setup()` rejects any other shape (a
+    string, `headers = false`, a list of names, non-boolean values) at once, not at the
+    first send.
+  - The option is read when a header is registered or a text is masked, so a later
+    `setup()` changes later sends only; values already registered stay registered.
 - Values shorter than 4 characters are never registered, from any source: masking them would
   blank out unrelated text.
 - For each registered value, its JSON-escaped form (`vim.json.encode(v):sub(2, -2)`) is
@@ -611,6 +624,7 @@ require("wire").setup({
   helpers = {},  -- global helper files (§5.2)
   timeout = nil, -- seconds; nil = no overall limit
   trusted_dirs = {}, -- discovered files under these skip :trust (§5.3)
+  mask = { headers = { authorization = true, … } }, -- auto-masked headers; false = off (§8)
 })
 ```
 
@@ -648,7 +662,8 @@ README.md         usage, dialect, helpers, migration from kulala
 
 Dependencies:
 
-- `document`, `project`, `mask`, `transport` depend on nothing in wire.
+- `document` and `transport` depend on nothing in wire; `project` and `mask` read
+  `config`.
 - `env` and `helpers` → `project`.
 - `context` → `env`, `helpers`, `mask` (it registers private values when rendering them);
   `template` and `script` → `context`.
@@ -753,6 +768,11 @@ with `vim.secure.trust({ action = "allow", path = … })`, again after each rewr
 | project | A file in a sibling sharing a `trusted_dirs` entry's name prefix still needs `:trust` | Prefix compared without a path separator |
 | run | Under `trusted_dirs`, never-trusted env and helper files are used by a send | `trusted_dirs` not consulted on the send path |
 | mask | A shorter registered value inside a longer one does not leave the longer one's tail visible | Values are not replaced longest first |
+| mask | With `Cookie = false`, a Cookie value is shown while an `X-Api-Key` value stays masked | Header names not lowercased before the merge, or the option disables all masking |
+| mask | A header added in `mask.headers` is masked | The built-in header list is used instead of the option |
+| mask | With `mask = false`, a `secret()` value and an `Authorization` credential are shown | `apply` ignores the option |
+| mask | `mask = true` keeps the default masking; a string, `headers = false` or a non-boolean header value fails `setup()` | Options are merged unchecked and break the first send |
+| project | An empty or relative `trusted_dirs` entry fails `setup()` and trusts nothing | An empty entry becomes the prefix `/` |
 | run | Cancelling `:Wire all` on a hanging request ends the run, sends nothing more, and a second start meanwhile is refused | Cancel does not stop the run or leaves it active |
 | run | A post script that throws is a failed test named `post script (line N)`; the response is kept and the next section runs | Post-script errors abort |
 | run | Lines inserted above a section during its run move its quickfix entry with it | Lines come from the snapshot, not the extmark |

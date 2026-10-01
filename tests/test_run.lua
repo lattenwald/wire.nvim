@@ -11,9 +11,17 @@ local function paths()
 end
 
 local T = MiniTest.new_set({
-  hooks = H.server_hooks(function(s)
-    server = s
-  end),
+  hooks = vim.tbl_extend(
+    "error",
+    H.server_hooks(function(s)
+      server = s
+    end),
+    {
+      post_case = function()
+        require("wire.config").setup({})
+      end,
+    }
+  ),
 })
 
 T["a parse error or a broken script anywhere refuses the whole run"] = function()
@@ -177,15 +185,12 @@ T["an untrusted env file refuses the run and is not evaluated"] = function()
 end
 
 T["under trusted_dirs, never-trusted project files are used"] = function()
-  local config = require("wire.config")
   local root = H.tmpdir()
   H.write(root .. "/http-client.env.json", [[{ "dev": { "k": "env" } }]])
   H.write(root .. "/http-client.lua", 'return { h = function() return "helper" end }')
   local buf = H.http_buf(root .. "/r.http", { "### one", "GET " .. server.url .. "/{{k}}/{%= h() %}" })
-  config.setup({ trusted_dirs = { root } })
-  local ok, err = pcall(H.run, buf, "all")
-  config.setup({})
-  assert(ok, err)
+  require("wire.config").setup({ trusted_dirs = { root } })
+  H.run(buf, "all")
   eq(paths(), { "/env/helper" })
 end
 

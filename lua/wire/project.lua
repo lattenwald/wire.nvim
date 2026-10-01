@@ -1,9 +1,12 @@
+local config = require("wire.config")
+
 local M = {}
 
 M.markers = { "http-client.lua", "http-client.env.json", "http-client.private.env.json" }
 
 local function under(path, dir)
-  return path == dir or path:sub(1, #dir + 1) == dir .. "/"
+  local prefix = dir:sub(-1) == "/" and dir or dir .. "/"
+  return path == dir or path:sub(1, #prefix) == prefix
 end
 
 function M.find_root(base_dir)
@@ -44,10 +47,19 @@ function M.resolve(base_dir, path)
   return vim.fs.normalize(path)
 end
 
+function M.read_file(path)
+  local f, err = io.open(path, "rb")
+  if not f then
+    return nil, err
+  end
+  local s = f:read("*a")
+  f:close()
+  return s
+end
+
 local function in_trusted_dir(path)
-  for _, dir in ipairs(require("wire.config").options.trusted_dirs) do
-    dir = vim.fs.normalize(dir)
-    if dir == "/" or under(path, dir) then
+  for _, dir in ipairs(config.options.trusted_dirs) do
+    if under(path, dir) then
       return true
     end
   end
@@ -59,7 +71,7 @@ function M.read_trusted(path)
     return nil, "missing"
   end
   if in_trusted_dir(path) then
-    return require("wire.helpers").read_file(path)
+    return M.read_file(path)
   end
   local content = vim.secure.read(path)
   if type(content) ~= "string" then

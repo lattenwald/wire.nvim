@@ -14,7 +14,7 @@ T["import overrides http-client.lua, which overrides a global file"] = function(
     imports = { { kind = "inline", code = 'return { c = "import" }', line = 1 } },
     base_dir = root,
     file = "t.http",
-    read_import = helpers.read_file,
+    read_import = require("wire.project").read_file,
   })
   eq({ merged.a, merged.b, merged.c }, { "global", "project", "import" })
 end
