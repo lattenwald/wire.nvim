@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/lattenwald/wire.nvim/compare/v0.1.0...v0.2.0) (2026-10-01)
+
+
+### Features
+
+* mask option to relax or extend secret masking; validate trusted_dirs and mask in setup ([816628f](https://github.com/lattenwald/wire.nvim/commit/816628f584f54e27e13fe3727805497259247ffd))
+* trusted_dirs option to skip :trust for project files under listed directories ([c3a615d](https://github.com/lattenwald/wire.nvim/commit/c3a615d906e7f112f9c7005e9bfe9b6c06f05a5b))
+
 ## 0.1.0 (2026-09-30)
 
 
