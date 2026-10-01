@@ -123,6 +123,8 @@ local function winbar()
   return table.concat(parts)
 end
 
+local set_keys
+
 local function visible()
   return state.win and vim.api.nvim_win_is_valid(state.win)
 end
@@ -137,7 +139,10 @@ function M.render()
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modifiable = false
-  vim.bo[buf].filetype = ft or "text"
+  if vim.bo[buf].filetype ~= ft then
+    vim.bo[buf].filetype = ft
+    set_keys(buf)
+  end
   vim.b[buf].wire_env = res.env_name
   vim.wo[state.win].winbar = winbar()
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
@@ -163,20 +168,20 @@ _G.wire_tab_click = function(i)
   show_tab(TABS[i].id)
 end
 
-function M.prev()
-  if viewed > 1 then
-    viewed = viewed - 1
+local function step(delta)
+  if history[viewed + delta] then
+    viewed = viewed + delta
+    M.render()
   end
-  M.render()
   return history[viewed]
 end
 
+function M.prev()
+  return step(-1)
+end
+
 function M.next()
-  if viewed < #history then
-    viewed = viewed + 1
-  end
-  M.render()
-  return history[viewed]
+  return step(1)
 end
 
 function M.push(res)
@@ -278,8 +283,10 @@ keys_help = function()
   vim.api.nvim_create_autocmd("WinLeave", { buffer = buf, once = true, callback = close_help })
 end
 
-local function set_keys(buf)
+set_keys = function(buf)
   for _, k in ipairs(key_list()) do
+    -- nowait loses to a longer buffer-local map defined later (:h map-nowait)
+    pcall(vim.keymap.del, "n", k[1], { buffer = buf })
     vim.keymap.set("n", k[1], k[3], { buffer = buf, nowait = true, silent = true, desc = "wire: " .. k[2] })
   end
 end
@@ -293,7 +300,6 @@ local function ensure_window()
     vim.api.nvim_buf_set_name(state.buf, "wire://response")
     vim.bo[state.buf].bufhidden = "hide"
     vim.b[state.buf].wire_response = true
-    set_keys(state.buf)
   end
   state.win = vim.api.nvim_open_win(state.buf, false, { split = "right", win = -1 })
   return true

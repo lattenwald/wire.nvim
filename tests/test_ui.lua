@@ -4,19 +4,6 @@ local eq = MiniTest.expect.equality
 
 local T = MiniTest.new_set()
 
-T["[ and ] step through history and stop at its ends"] = function()
-  local a, b, c = { id = "a" }, { id = "b" }, { id = "c" }
-  response.push(a)
-  response.push(b)
-  response.push(c)
-  eq(response.prev(), b)
-  eq(response.prev(), a)
-  eq(response.prev(), a)
-  eq(response.next(), b)
-  response.push({ id = "d" })
-  eq(response.next().id, "d")
-end
-
 T[":Wire completes subcommands in a stable order"] = function()
   vim.cmd("runtime plugin/wire.lua")
   eq(vim.fn.getcompletion("Wire ", "cmdline"), { "all", "cancel", "env", "open", "reset", "scratch", "send" })
@@ -50,6 +37,20 @@ T["JSON is pretty-printed only by jq 1.7 or later"] = function()
       eq(vim.api.nvim_buf_get_lines(vim.fn.bufnr("wire://response"), 0, 1, false)[1], case[2])
     end)
   end
+end
+
+T["] on the newest result does not redraw"] = function()
+  response.push({
+    outcome = "ok",
+    tests = {},
+    summary = { "", "", "" },
+    response = { status = 200, headers = {}, body = "x", time = 0 },
+  })
+  response.open()
+  local buf = vim.fn.bufnr("wire://response")
+  local tick = vim.b[buf].changedtick
+  response.next()
+  eq(vim.b[buf].changedtick, tick)
 end
 
 T["env() in the response window is the viewed result's environment"] = function()

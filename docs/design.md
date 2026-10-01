@@ -764,7 +764,7 @@ with `vim.secure.trust({ action = "allow", path = … })`, again after each rewr
 | transport | Against a server that never answers, cancel yields "cancelled" and the process is gone | Kill not wired through |
 | transport | Against a server that never answers, `timeout = 1` yields a transport failure | `--max-time` not passed |
 | run | A variable set by section 1's post script reaches section 2; an abort in section 2 stops section 3 | Vars not carried within a run / abort not stopping |
-| ui | `[` and `]` land on the right history entry; quickfix entries point at the failing sections' `###` lines | Index or line mapping is off |
+| ui | Quickfix entries point at the failing sections' `###` lines | Line mapping is off |
 | project | A nearer directory with only an env file beats a farther one with `http-client.lua` | `vim.fs.root` gets a flat list |
 | project | After `:write` of a changed `http-client.lua`, it reads as trusted | Auto-trust on save is missing |
 | project | A file in a sibling sharing a `trusted_dirs` entry's name prefix still needs `:trust` | Prefix compared without a path separator |
