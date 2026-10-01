@@ -61,6 +61,37 @@ With lazy.nvim: >lua
     }
 <
                                                                 *wire-options*
+Defaults, with examples commented out: >lua
+    require("wire").setup({
+      -- global helper files, loaded before each project's http-client.lua
+      helpers = {},
+      -- helpers = { "~/.config/wire/helpers.lua" },
+
+      -- overall limit per request in seconds; nil = none
+      timeout = nil,
+      -- timeout = 30,
+
+      -- absolute dirs whose project files skip :trust; { "/" } trusts all
+      trusted_dirs = {},
+      -- trusted_dirs = { "~/projects" },
+
+      -- secrets show as •••• (private env values, secret(), and these
+      -- request headers); name only the headers you change; false masks
+      -- nothing
+      mask = {
+        headers = {
+          authorization = true,
+          ["proxy-authorization"] = true,
+          cookie = true,
+          ["x-api-key"] = true,
+          ["api-key"] = true,
+        },
+      },
+      -- mask = { headers = { Cookie = false } },  -- show cookies
+      -- mask = { headers = { ["X-Auth-Token"] = true } },
+      -- mask = false,                             -- show everything
+    })
+<
 `setup(opts)` takes:
 
   helpers    List of global helper files, loaded before the project's own
@@ -72,8 +103,9 @@ With lazy.nvim: >lua
              skip |:trust| (|wire-trust|); `{ "/" }` trusts every file.
              Default: none.
   mask       `false` to mask nothing, or `{ headers = { Name = bool } }` to
-             change which request headers are masked (|wire-masking|).
-             Default: the headers listed there.
+             change which request headers are masked; private env and
+             `secret()` values stay masked (|wire-masking|). Default: the
+             headers listed there.
 
 wire defines no global mappings.
 

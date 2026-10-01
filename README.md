@@ -71,23 +71,41 @@ to `vim.pack.add`.
 
 ## Configuration
 
+Defaults, with examples commented out:
+
 ```lua
 require("wire").setup({
-  helpers = {},  -- global helper files, loaded before each project's http-client.lua
-  timeout = nil, -- overall limit per request in seconds; nil = none (connect timeout is 10 s)
-  trusted_dirs = {}, -- project files under these dirs skip :trust; { "/" } trusts all
-  mask = { headers = { ... } }, -- which request headers are masked; false = mask nothing
+  -- global helper files, loaded before each project's http-client.lua
+  helpers = {},
+  -- helpers = { "~/.config/wire/helpers.lua" },
+
+  -- overall limit per request in seconds; nil = none (connect timeout is always 10 s)
+  timeout = nil,
+  -- timeout = 30,
+
+  -- absolute dirs whose project files skip :trust; { "/" } trusts every file
+  trusted_dirs = {},
+  -- trusted_dirs = { "~/projects" },
+
+  -- secrets show as •••• (private env values, secret(), and these request headers);
+  -- name only the headers you change; false masks nothing
+  mask = {
+    headers = {
+      authorization = true,
+      ["proxy-authorization"] = true,
+      cookie = true,
+      ["x-api-key"] = true,
+      ["api-key"] = true,
+    },
+  },
+  -- mask = { headers = { Cookie = false } },          -- show cookies
+  -- mask = { headers = { ["X-Auth-Token"] = true } }, -- also mask a custom header
+  -- mask = false,                                     -- show everything
 })
 ```
 
-Auth headers, cookies, private env values and `secret()` values show as `••••` in
-everything wire displays. To relax that:
-
-```lua
-mask = { headers = { Cookie = false } }          -- show cookies
-mask = { headers = { ["X-Auth-Token"] = true } } -- also mask a custom header
-mask = false                                     -- show everything
-```
+Secrets are masked in everything wire displays; response bodies and headers are shown as
+received.
 
 `:Wire send|all|cancel|open|env|scratch|reset`. Statusline: `require("wire").env()`.
 Full documentation: `:help wire`.
