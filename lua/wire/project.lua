@@ -44,9 +44,22 @@ function M.resolve(base_dir, path)
   return vim.fs.normalize(path)
 end
 
+local function in_trusted_dir(path)
+  for _, dir in ipairs(require("wire.config").options.trusted_dirs) do
+    dir = vim.fs.normalize(dir)
+    if dir == "/" or under(path, dir) then
+      return true
+    end
+  end
+  return false
+end
+
 function M.read_trusted(path)
   if not vim.uv.fs_stat(path) then
     return nil, "missing"
+  end
+  if in_trusted_dir(path) then
+    return require("wire.helpers").read_file(path)
   end
   local content = vim.secure.read(path)
   if type(content) ~= "string" then

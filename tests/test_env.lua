@@ -59,6 +59,44 @@ T["an untrusted env file contributes nothing"] = function()
   eq(untrusted, { path })
 end
 
+local function with_trusted_dirs(dirs, fn)
+  local config = require("wire.config")
+  config.setup({ trusted_dirs = dirs })
+  local ok, err = pcall(fn)
+  config.setup({})
+  if not ok then
+    error(err, 0)
+  end
+end
+
+T["a sibling sharing a trusted dir's name prefix still needs :trust"] = function()
+  local root = H.tmpdir()
+  local path = H.write(root .. "-other/http-client.lua", "return {}")
+  with_trusted_dirs({ root }, function()
+    eq({ project.read_trusted(path) }, { nil, "untrusted" })
+  end)
+end
+
+T["trusted_dirs { '/' } trusts every file"] = function()
+  local path = H.write(H.tmpdir() .. "/http-client.lua", "return {}")
+  with_trusted_dirs({ "/" }, function()
+    eq(project.read_trusted(path), "return {}")
+  end)
+end
+
+T["trusted_dirs expands ~"] = function()
+  local home, saved = H.tmpdir(), vim.env.HOME
+  local path = H.write(home .. "/p/http-client.lua", "return {}")
+  vim.env.HOME = home
+  local ok, err = pcall(with_trusted_dirs, { "~/p/" }, function()
+    eq(project.read_trusted(path), "return {}")
+  end)
+  vim.env.HOME = saved
+  if not ok then
+    error(err, 0)
+  end
+end
+
 T["the nearest directory with any project file is the root"] = function()
   local root = H.tmpdir()
   H.write(root .. "/http-client.lua", "return {}")

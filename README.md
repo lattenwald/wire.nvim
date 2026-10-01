@@ -75,6 +75,7 @@ to `vim.pack.add`.
 require("wire").setup({
   helpers = {},  -- global helper files, loaded before each project's http-client.lua
   timeout = nil, -- overall limit per request in seconds; nil = none (connect timeout is 10 s)
+  trusted_dirs = {}, -- project files under these dirs skip :trust; { "/" } trusts all
 })
 ```
 
@@ -118,7 +119,8 @@ end)
 Helpers are Lua tables of functions: global files from `setup`, `http-client.lua` in the
 project directory, then preamble imports. `http-client.env.json` and
 `http-client.private.env.json` hold environments; values are templates. Discovered project
-files go through Neovim's `:trust`; files you save from Neovim are trusted automatically.
+files go through Neovim's `:trust`; files you save from Neovim are trusted automatically,
+and files under `trusted_dirs` are not gated (their `http-client.lua` runs on send).
 
 ## Migrating from kulala
 

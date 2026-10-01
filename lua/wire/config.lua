@@ -3,6 +3,7 @@ local M = {}
 M.defaults = {
   helpers = {},
   timeout = nil,
+  trusted_dirs = {},
 }
 
 M.options = vim.deepcopy(M.defaults)

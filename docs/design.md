@@ -308,6 +308,12 @@ Helpers call each other as plain names, can keep module-level state (caches), an
     from the file's when the buffer was read from a file without a final newline, and the
     saved file would still be untrusted.
   - wire compiles the string `vim.secure.read` returned, never a second read of the file.
+  - **Trusted directories** (opt-in): a discovered file whose normalized path lies under an
+    entry of `setup({ trusted_dirs = { … } })` is read directly, with no prompt; `~` is
+    expanded, a match is by whole path components, and `{ "/" }` trusts every file. The
+    gate exists for cloned and pulled code, so the option is honoured only from `setup()`
+    and never from project files. Prior art: mise `trusted_config_paths`, direnv's
+    whitelist prefix, VS Code trusted folders.
 - Files the `.http` file names itself (`<` / `>` paths) are trusted like the `.http` file,
   which is opened and sent on purpose. The exception is the scratchpad, whose base
   directory is whatever the cwd was: its relative `<` / `>` files go through
@@ -604,6 +610,7 @@ found. Trust status is not shown: `vim.secure` has no public query; `:trust` man
 require("wire").setup({
   helpers = {},  -- global helper files (§5.2)
   timeout = nil, -- seconds; nil = no overall limit
+  trusted_dirs = {}, -- discovered files under these skip :trust (§5.3)
 })
 ```
 
@@ -743,6 +750,8 @@ with `vim.secure.trust({ action = "allow", path = … })`, again after each rewr
 | ui | `[` and `]` land on the right history entry; quickfix entries point at the failing sections' `###` lines | Index or line mapping is off |
 | project | A nearer directory with only an env file beats a farther one with `http-client.lua` | `vim.fs.root` gets a flat list |
 | project | After `:write` of a changed `http-client.lua`, it reads as trusted | Auto-trust on save is missing |
+| project | A file in a sibling sharing a `trusted_dirs` entry's name prefix still needs `:trust` | Prefix compared without a path separator |
+| run | Under `trusted_dirs`, never-trusted env and helper files are used by a send | `trusted_dirs` not consulted on the send path |
 | mask | A shorter registered value inside a longer one does not leave the longer one's tail visible | Values are not replaced longest first |
 | run | Cancelling `:Wire all` on a hanging request ends the run, sends nothing more, and a second start meanwhile is refused | Cancel does not stop the run or leaves it active |
 | run | A post script that throws is a failed test named `post script (line N)`; the response is kept and the next section runs | Post-script errors abort |

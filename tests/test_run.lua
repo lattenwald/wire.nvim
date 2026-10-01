@@ -176,6 +176,19 @@ T["an untrusted env file refuses the run and is not evaluated"] = function()
   eq(server.requests(), {})
 end
 
+T["under trusted_dirs, never-trusted project files are used"] = function()
+  local config = require("wire.config")
+  local root = H.tmpdir()
+  H.write(root .. "/http-client.env.json", [[{ "dev": { "k": "env" } }]])
+  H.write(root .. "/http-client.lua", 'return { h = function() return "helper" end }')
+  local buf = H.http_buf(root .. "/r.http", { "### one", "GET " .. server.url .. "/{{k}}/{%= h() %}" })
+  config.setup({ trusted_dirs = { root } })
+  local ok, err = pcall(H.run, buf, "all")
+  config.setup({})
+  assert(ok, err)
+  eq(paths(), { "/env/helper" })
+end
+
 T["cancel ends the run; a second run is refused while one is active"] = function()
   local run = require("wire.run")
   local buf = H.http_buf(H.tmpdir() .. "/r.http", {

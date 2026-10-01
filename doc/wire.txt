@@ -67,6 +67,9 @@ With lazy.nvim: >lua
              (|wire-helpers|). Default: none.
   timeout    Overall limit per request in seconds (curl `--max-time`).
              Default: none; the connect timeout is always 10 s.
+  trusted_dirs
+             List of directories whose project files skip |:trust|
+             (|wire-trust|); `{ "/" }` trusts every file. Default: none.
 
 wire defines no global mappings.
 
@@ -335,6 +338,11 @@ Saving one of these files from Neovim trusts it automatically. A file changed
 by `git pull` needs `:trust` again. Files the `.http` file names itself
 (`<` and `>` paths) are trusted like the `.http` file, except in the
 scratchpad.
+
+Files under a directory in `setup({ trusted_dirs = { ... } })` are read
+without |:trust|; `~` is expanded. This runs any `http-client.lua` there when
+you send, including one a `git pull` just changed, so list only directories
+whose contents you control. The option is read only from `setup()`.
 
 ==============================================================================
 12. SECRET MASKING                                              *wire-masking*
