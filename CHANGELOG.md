@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/lattenwald/wire.nvim/compare/v0.2.0...v0.3.0) (2026-10-01)
+
+
+### Features
+
+* env() in the response window returns the shown result's environment; statusline examples ([c7154ee](https://github.com/lattenwald/wire.nvim/commit/c7154ee198c7bd522aba7ef14000457a6dd8afc2))
+
+
+### Bug Fixes
+
+* **ui:** [ and ] no longer wait on ftplugin maps or redraw at the ends of history ([6038acc](https://github.com/lattenwald/wire.nvim/commit/6038accb240f69c2ef1c03a58922c1a2d62d3583))
+
 ## [0.2.0](https://github.com/lattenwald/wire.nvim/compare/v0.1.0...v0.2.0) (2026-10-01)
 
 
