@@ -128,6 +128,7 @@ local function snapshot(buf, which, row)
     base_dir = base,
     env_unselected = env_name == nil and #envs.names > 0,
     env_warnings = envs.warnings,
+    env_name = env_name,
     env_label = env_name or (root and "none" or "no project"),
     env_vars = e.vars or {},
     env_private = e.private or {},
@@ -343,6 +344,7 @@ step = function(run)
     mark = run.marks[sec],
     file = snap.file,
     env = snap.env_label,
+    env_name = snap.env_name,
     tests = {},
     time = os.time(),
   }

@@ -351,7 +351,9 @@ Helpers call each other as plain names, can keep module-level state (caches), an
   environment a send would use, as resolved by the last send, `:Wire env` or env-file save in
   that project, falling back to the stored selection before any of these. It reads that
   cache and the buffer's cached project directory; it does no I/O, since reading an env file
-  can raise a trust prompt.
+  can raise a trust prompt. In the response window it returns the environment of the result
+  on display (`nil` for none or no project), which the window stores in a buffer variable
+  each time it draws a result.
 - Saving an env file from Neovim re-reads the project's environments, but only for a project
   already loaded this session: the other env file was trusted then, so the read cannot
   prompt unless that file changed outside Neovim. Env files changed outside Neovim take

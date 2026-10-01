@@ -15,6 +15,7 @@ wire-options	wire.txt	/*wire-options*
 wire-response	wire.txt	/*wire-response*
 wire-scripts	wire.txt	/*wire-scripts*
 wire-setup	wire.txt	/*wire-setup*
+wire-statusline	wire.txt	/*wire-statusline*
 wire-tests	wire.txt	/*wire-tests*
 wire-trust	wire.txt	/*wire-trust*
 wire-variables	wire.txt	/*wire-variables*

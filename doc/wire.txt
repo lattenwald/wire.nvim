@@ -489,8 +489,24 @@ for colouring; the body's first character decides.
   env()            The environment a send from the current buffer would use,
                    or `nil`, as of the last send, |:Wire| env or env file
                    save in its project; before those, the stored selection.
-                   No I/O, so it suits a statusline.
+                   In the response window, the environment the shown
+                   result was sent with. No I/O, so it suits a statusline
+                   (|wire-statusline|).
   ctx()            During a send, the names of |wire-expressions| for code in
                    a plain Lua module; errors outside a send.
+
+                                                            *wire-statusline*
+Show the environment in the statusline. `env()` returns `nil` when there is
+none, so give the statusline an empty string instead: >lua
+    -- 'statusline'
+    vim.o.statusline = [[%f %=%{luaeval("require'wire'.env() or ''")} ]]
+
+    -- lualine
+    require("lualine").setup({
+      sections = {
+        lualine_x = { function() return require("wire").env() or "" end },
+      },
+    })
+<
 
  vim:tw=78:ts=8:ft=help:norl:

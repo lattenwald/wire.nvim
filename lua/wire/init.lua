@@ -135,7 +135,11 @@ function M.scratchpad()
 end
 
 function M.env()
-  local root = require("wire.project").cached_project(vim.api.nvim_get_current_buf())
+  local buf = vim.api.nvim_get_current_buf()
+  if vim.b[buf].wire_response then
+    return vim.b[buf].wire_env
+  end
+  local root = require("wire.project").cached_project(buf)
   return root and require("wire.env").cached_name(root) or nil
 end
 

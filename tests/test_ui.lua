@@ -52,4 +52,23 @@ T["JSON is pretty-printed only by jq 1.7 or later"] = function()
   end
 end
 
+T["env() in the response window is the viewed result's environment"] = function()
+  local root = H.tmpdir()
+  H.trust(H.write(root .. "/http-client.env.json", [[{ "dev": {} }]]))
+  -- port 9 (discard) refuses connections
+  local a = H.http_buf(root .. "/r.http", { "### one", "GET http://127.0.0.1:9/one" })
+  local b = H.http_buf(H.tmpdir() .. "/r.http", { "### two", "GET http://127.0.0.1:9/two" })
+  for _, buf in ipairs({ a, b }) do
+    response.push(H.run(buf, "all")[1])
+  end
+  response.open()
+  vim.api.nvim_set_current_win(vim.fn.bufwinid("wire://response"))
+  local seen = { require("wire").env() }
+  response.prev()
+  seen[2] = require("wire").env()
+  response.next()
+  seen[3] = require("wire").env()
+  eq(seen, { nil, "dev", nil })
+end
+
 return T

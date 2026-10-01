@@ -138,6 +138,7 @@ function M.render()
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modifiable = false
   vim.bo[buf].filetype = ft or "text"
+  vim.b[buf].wire_env = res.env_name
   vim.wo[state.win].winbar = winbar()
   vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
   local hl = res.failed and "DiagnosticError" or "DiagnosticOk"
@@ -291,6 +292,7 @@ local function ensure_window()
     state.buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_name(state.buf, "wire://response")
     vim.bo[state.buf].bufhidden = "hide"
+    vim.b[state.buf].wire_response = true
     set_keys(state.buf)
   end
   state.win = vim.api.nvim_open_win(state.buf, false, { split = "right", win = -1 })

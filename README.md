@@ -107,8 +107,24 @@ require("wire").setup({
 Secrets are masked in everything wire displays; response bodies and headers are shown as
 received.
 
-`:Wire send|all|cancel|open|env|scratch|reset`. Statusline: `require("wire").env()`.
-Full documentation: `:help wire`.
+`:Wire send|all|cancel|open|env|scratch|reset`. Full documentation: `:help wire`.
+
+### Statusline
+
+`require("wire").env()` returns the environment of the current `.http` buffer, or of the
+result shown in the response window; `nil` when there is none. It does no I/O.
+
+```lua
+-- 'statusline'
+vim.o.statusline = [[%f %=%{luaeval("require'wire'.env() or ''")} ]]
+
+-- lualine
+require("lualine").setup({
+  sections = {
+    lualine_x = { function() return require("wire").env() or "" end },
+  },
+})
+```
 
 ## The dialect
 
