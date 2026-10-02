@@ -17,6 +17,7 @@ wire-scripts	wire.txt	/*wire-scripts*
 wire-setup	wire.txt	/*wire-setup*
 wire-statusline	wire.txt	/*wire-statusline*
 wire-tests	wire.txt	/*wire-tests*
+wire-timing	wire.txt	/*wire-timing*
 wire-trust	wire.txt	/*wire-trust*
 wire-variables	wire.txt	/*wire-variables*
 wire.txt	wire.txt	/*wire.txt*

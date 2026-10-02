@@ -1,8 +1,16 @@
 # wire.nvim
 
-A small `.http` client for Neovim: send the request at the cursor or the whole file, a
-scratchpad, environments, and Lua scripting with tests. The design is in
-[docs/design.md](docs/design.md).
+A small `.http` client for Neovim. The design is in [docs/design.md](docs/design.md).
+
+- Send the request at the cursor or the whole file, from a project or a scratchpad.
+- The JetBrains `.http` dialect and `http-client.env.json` environments.
+- Lua throughout: `{%= expr %}` in templates, helper files, and pre/post scripts with tests.
+- A response window with the body (JSON pretty-printed), headers, the request as sent,
+  script output and a per-run report; failures go to the quickfix list.
+- A timing breakdown of each request: DNS, connect, TLS, server wait, download and
+  `Server-Timing`.
+- Secrets masked everywhere wire shows them; project files gated by `:trust`.
+- Copy a request as a `curl` command, from the `.http` buffer or the response window.
 
 ## Requirements
 
@@ -40,6 +48,7 @@ trusting env and helper files you save. Run `:checkhealth wire` afterwards.
     { "<leader>Re", "<cmd>Wire env<cr>", desc = "Select environment" },
     { "<leader>Rc", "<cmd>Wire cancel<cr>", desc = "Cancel run" },
     { "<leader>Ro", "<cmd>Wire open<cr>", desc = "Open response window" },
+    { "<leader>Ry", "<cmd>Wire yank<cr>", desc = "Yank request as curl" },
   },
 }
 ```
@@ -48,7 +57,6 @@ trusting env and helper files you save. Run `:checkhealth wire` afterwards.
 
 ```lua
 vim.pack.add({ "https://github.com/lattenwald/wire.nvim" })
-    { "<leader>Ry", "<cmd>Wire yank<cr>", desc = "Yank request as curl" },
 require("wire").setup({})
 
 vim.keymap.set("n", "<leader>Rs", "<cmd>Wire send<cr>", { desc = "Send request" })
@@ -57,6 +65,7 @@ vim.keymap.set("n", "<leader>Rb", "<cmd>Wire scratch<cr>", { desc = "Scratchpad"
 vim.keymap.set("n", "<leader>Re", "<cmd>Wire env<cr>", { desc = "Select environment" })
 vim.keymap.set("n", "<leader>Rc", "<cmd>Wire cancel<cr>", { desc = "Cancel run" })
 vim.keymap.set("n", "<leader>Ro", "<cmd>Wire open<cr>", { desc = "Open response window" })
+vim.keymap.set("n", "<leader>Ry", "<cmd>Wire yank<cr>", { desc = "Yank request as curl" })
 ```
 
 wire defines no global mappings; the keys above are a suggestion.
@@ -65,7 +74,6 @@ wire defines no global mappings; the keys above are a suggestion.
 
 Releases are tagged `vX.Y.Z` following [semver](https://semver.org), with changes listed
 in [CHANGELOG.md](CHANGELOG.md); the `stable` tag marks the latest release. Before 1.0 a
-vim.keymap.set("n", "<leader>Ry", "<cmd>Wire yank<cr>", { desc = "Yank request as curl" })
 breaking change bumps the minor version. `main` gets every change first; to stay on
 releases, add `version = "*"` to the lazy.nvim spec, or pass
 `{ src = "https://github.com/lattenwald/wire.nvim", version = vim.version.range("*") }`

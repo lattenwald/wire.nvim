@@ -25,7 +25,7 @@ CONTENTS                                                       *wire-contents*
 wire sends the requests in `.http` files with `curl`: the request at the
 cursor or the whole file, with variables, environments, Lua expressions and
 Lua test scripts. Responses open in a split with tabs for the body, headers,
-the request as sent, script output and a per-run report.
+the request as sent with its timing, script output and a per-run report.
 
 Requirements: Neovim >= 0.12 and `curl` >= 7.83. Optional: `jq` >= 1.7 (JSON
 pretty-printing, key order kept; older jq rounds large integers, so wire
@@ -277,8 +277,9 @@ reached each point, 0 if it did not: `dns`, `connect`, `tls`, `request_sent`
 (`nil` before curl 8.10), `first_byte` (a `100 Continue` counts), `total`;
 then `exited` (curl exited) and `wall` (wire got the result). `server`
 lists the `Server-Timing` entries of every such header as
-`{ name, duration, desc }`, `duration` in seconds. Also `remote` (`ip:port`, `[ip]:port` for IPv6),
-`http_version`, `bytes_sent`, `bytes_received`. >lua
+`{ name, duration, desc }`, `duration` in seconds. Also `remote` (`ip:port`,
+`[ip]:port` for IPv6), `http_version`, `bytes_sent`, `bytes_received`. See
+|wire-timing| for what the points mean. >lua
     test("fast", function(t)
       t.ok(response.timing.first_byte < 0.5, "first byte within 500 ms")
     end)
@@ -441,12 +442,7 @@ text (green on success, red on failure). Focus stays in the `.http` buffer.
   H    Response headers.
   A    Headers and body.
   V    Verbose: the request as sent, then the response status and headers,
-       then the timing: DNS lookup, TCP connect, TLS handshake, sending,
-       waiting for the first byte and download, as measured by curl, plus
-       starting and ending curl and waiting for Neovim's event loop; the
-       server's `Server-Timing` entries with the wait minus the longest
-       one; then the remote address, HTTP version and bytes sent and
-       received.
+       then the timing (|wire-timing|).
   O    Script Output: `log()` output and script errors.
   R    Report, as a markdown table: one row per section of the run and one
        per test (`✔`/`✘`), then the failure messages under a heading per
@@ -468,6 +464,59 @@ reminder. A result with a failed test opens on Report, an abort on Script
 Output; otherwise a visible window keeps its tab. The `###` line of each
 sent section shows an icon: `✔ 200 · 0.42 s`,
 `✘ 500 · 2 failed`, `✘ aborted`, `✘ cancelled` or the curl error.
+
+                                                                 *wire-timing*
+The Verbose tab ends with the request's timing: >
+    Timing                     phase     elapsed
+      DNS lookup             46.8 ms     46.8 ms
+      TCP connect            41.3 ms     88.1 ms
+      TLS handshake          42.7 ms    130.8 ms
+      Send request            0.1 ms    130.9 ms
+      Waiting (TTFB)        156.4 ms    287.3 ms
+      Download                0.1 ms    287.4 ms
+      curl start, exit       11.7 ms    299.1 ms
+      Neovim loop             0.0 ms    299.1 ms
+    Server-Timing           duration
+      db                     53.0 ms  query
+      app                   120.5 ms
+      Waiting - app          35.9 ms
+    Connection: 93.184.215.14:443  HTTP/2
+    Bytes: 141 sent, 1244 received
+<
+`phase` is how long a step took, `elapsed` when it ended, from the start of
+the transfer. A step that was not reached is left out, so the phases add up
+to the last `elapsed`.
+
+  DNS lookup        Resolving the host name.
+  TCP connect       The TCP handshake.
+  TLS handshake     The TLS handshake (https only).
+  Send request      Sending the request and its body (curl >= 8.10; with
+                    older curl this time is part of Waiting).
+  Waiting (TTFB)    From the request sent to the first response byte: the
+                    network round trip plus the server's time.
+  Download          The rest of the response. A failed request shows
+                    `Until error` instead.
+  curl start, exit  Starting and ending the curl process, outside curl's
+                    own clock.
+  Neovim loop       The result waiting for Neovim's event loop.
+
+`Server-Timing` lists the entries of every such response header.
+`Waiting - <name>` is the wait minus the longest entry: the part the
+server's own measurement does not cover. Entries may nest, so they are not
+added up.
+
+curl counts a `100 Continue` as the first byte. When the first byte arrives
+before the upload ends (a `100 Continue`, or an early reply such as a 401),
+the rows become `First byte`, `Send request` and `Waiting, download`, and a
+note line says so; the server's time is then inside `Waiting, download`.
+
+Every request starts a new curl process and a new connection, so each one
+pays for DNS, TCP and TLS; a client that keeps connections open pays them
+once. curl sends `Expect: 100-continue` with large bodies (over 1 MB as of
+curl 8.18) and waits up to a second for a server that never answers it;
+an empty `Expect:` header in the request turns it off.
+
+Scripts get the same numbers as `response.timing` (|wire-scripts|).
 
 ==============================================================================
 14. HIGHLIGHTING                                              *wire-highlight*
