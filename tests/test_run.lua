@@ -142,6 +142,33 @@ T["private env values and auth headers are masked in Verbose and logs"] = functi
   eq(r.logs:find("tk-9f8e7d-555", 1, true), nil)
 end
 
+T["Verbose shows the server's delay as Waiting"] = function()
+  local buf = H.http_buf(H.tmpdir() .. "/r.http", { "### slow", "GET " .. server.url .. "/sleep/300" })
+  local waiting = H.run(buf, "all")[1].verbose:match("\n  Waiting %(TTFB%)%s+([%d.]+) ms")
+  -- curl may stamp posttransfer after the server starts sleeping; the upper bound is a units check
+  eq(tonumber(waiting) >= 250 and tonumber(waiting) < 3000, true)
+end
+
+T["every Server-Timing header reaches scripts and Verbose"] = function()
+  local buf = H.http_buf(H.tmpdir() .. "/r.http", {
+    "### st",
+    "GET " .. server.url .. "/server-timing",
+    "",
+    "> {%",
+    'test("server", function(t)',
+    "  t.eq(response.timing.server, {",
+    [[    { name = "db", duration = 0.053, desc = 'a, "b"; c' },]],
+    '    { name = "app", duration = 0.1205 },',
+    '    { name = "cache", desc = "hit" },',
+    "  })",
+    "end)",
+    "%}",
+  })
+  local r = H.run(buf, "all")[1]
+  eq(r.tests[1].messages, {})
+  eq(r.verbose:find("\n  Waiting %- app%s+%-?[%d.]+ ms") ~= nil, true)
+end
+
 T["script variables outlive a run, not a reset"] = function()
   local buf = H.http_buf(H.tmpdir() .. "/r.http", {
     "### set",

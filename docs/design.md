@@ -202,7 +202,7 @@ through `require("wire").ctx()`, which errors outside a send.
 | `render(s)` | everywhere | Renders the string `s` as a template (§4.2–4.3) in the current request's scope and returns the result. |
 | `log(...)` | everywhere | Appends to the Script Output tab. |
 | `request` | post scripts | The request as sent: `name`, `method`, `url`, `headers` (including `$defaultHeaders`), `body`. |
-| `response` | post scripts | `status` (number), `headers`, `body` (raw string), `json` (the decoded body, or `nil` if it is not valid JSON). |
+| `response` | post scripts | `status` (number), `headers`, `body` (raw string), `json` (the decoded body, or `nil` if it is not valid JSON), `timing` (§9, the timing table). |
 | `test(name, fn)` | post scripts | Runs `fn(t)` as a named test (§4.7). |
 
 `request.headers` and `response.headers` are both tables keyed by lower-cased name; for a
@@ -523,9 +523,35 @@ the received bytes.
 | Body | `B` | The body, typed by the content-type table below. JSON is pretty-printed with `jq .` (key order kept); without `jq` ≥ 1.7 the raw body is shown. |
 | Headers | `H` | Response headers. |
 | All | `A` | Response headers, a blank line, then the body as in Body. |
-| Verbose | `V` | The request as sent (method, URL, headers, body), then the response status and headers. Masked. |
+| Verbose | `V` | The request as sent (method, URL, headers, body), then the response status and headers, then the timing (below). Masked. |
 | Script Output | `O` | `log()` output and script errors with tracebacks. Masked. |
 | Report | `R` | The run of the result being viewed, as markdown (filetype `markdown`, columns padded so it also reads unrendered): a `passed/total` line, a table with one row per section (line, name, status, duration, tests passed/total) and a `↳ ✔/✘` row per test, then one heading per failed section with each failed test's messages or the abort error in a fenced block. |
+
+The timing comes from curl's `-w %{json}` marks (seconds from the transfer start) and two
+clock readings wire takes from spawning curl: when curl exits (in the libuv callback) and
+when wire starts handling the result (after `vim.schedule`, before reading the body). Each row ends at one mark: DNS lookup
+(`time_namelookup`), TCP connect (`time_connect`), TLS handshake (`time_appconnect`), Send
+request (`time_posttransfer`, curl ≥ 8.10), Waiting (TTFB) (`time_starttransfer`), Download
+(`time_total`, or Until error when no byte arrived), curl start, exit (the exit reading),
+Neovim loop (the handling reading). A mark of 0 was not reached and its row is left out,
+so the phases add up to the last row's elapsed time. A transport error keeps its timing
+too.
+
+curl counts a `100 Continue` as the first byte. With a body over 1 MB curl sends
+`Expect: 100-continue`, the `100` arrives before the upload ends, and the real reply only
+after it; an early reply (a 401 before the body is read) looks the same. When
+`time_starttransfer` < `time_posttransfer`, the rows are First byte, Send request, then
+Waiting, download (`time_total`), which takes the place of Waiting for the
+`Waiting - <name>` row, and a note line follows.
+
+`Server-Timing` ([W3C](https://www.w3.org/TR/server-timing/)) values from every such header
+are joined and split into entries (`name;dur=<ms>;desc=…`, quoted strings may hold `,` and
+`;`); each entry is a row, followed by `Waiting - <name>`: the Waiting phase minus the
+longest entry, the time the server's own measurement does not cover. Entries may nest, so
+they are not summed.
+
+Post scripts get the same data as `response.timing`, in seconds; the fields are listed in
+`:help wire-scripts`.
 
 One content-type table maps `Content-Type` to `json`, `xml`, `html`, `javascript`, `text`
 or `binary`; the Body tab and the binary rule both use it. A binary body shows

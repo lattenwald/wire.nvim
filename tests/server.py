@@ -3,6 +3,7 @@ import http.server
 import json
 import sys
 import threading
+import time
 
 LOG = sys.argv[1]
 lock = threading.Lock()
@@ -22,9 +23,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             f.write(json.dumps(entry) + "\n")
         if self.path == "/hang":
             threading.Event().wait()
+        if self.path.startswith("/sleep/"):
+            time.sleep(int(self.path[len("/sleep/") :]) / 1000)
         if self.path == "/head10":
             self.send_response(200)
             self.send_header("Content-Length", "10")
+            self.end_headers()
+            return
+        if self.path == "/server-timing":
+            self.send_response(200)
+            self.send_header("Server-Timing", 'db;dur=53;desc="a, \\"b\\"; c"')
+            self.send_header("Server-Timing", "app;dur=120.5, cache;desc=hit")
+            self.send_header("Content-Length", "0")
             self.end_headers()
             return
         status = int(self.path[len("/status/") :]) if self.path.startswith("/status/") else 200

@@ -163,6 +163,69 @@ local function prepare(ctx, snap, sec)
   return { name = sec.name, method = req.method, url = url, headers = headers, body = body }
 end
 
+local function ms(s)
+  return ("%8.1f ms"):format(s * 1000)
+end
+
+local function server_lines(server, waiting)
+  local l = { ("%-20s %11s"):format("Server-Timing", "duration") }
+  local longest
+  for _, e in ipairs(server) do
+    local row = ("  %-18s %s"):format(e.name, e.duration and ms(e.duration) or (" "):rep(11))
+    l[#l + 1] = (row .. "  " .. (e.desc or "")):gsub("%s+$", "")
+    if e.duration and (not longest or e.duration > longest.duration) then
+      longest = e
+    end
+  end
+  if longest and waiting then
+    l[#l + 1] = ("  %-18s %s"):format("Waiting - " .. longest.name, ms(waiting - longest.duration))
+  end
+  return l
+end
+
+local function timing_lines(t)
+  -- curl counts a 100 Continue as the first byte; with Expect the real reply follows the upload
+  local early = t.request_sent and t.first_byte > 0 and t.first_byte < t.request_sent
+  local exchange = early
+      and {
+        { "First byte", t.first_byte },
+        { "Send request", t.request_sent },
+        { "Waiting, download", t.total, "waiting" },
+      }
+    or {
+      { "Send request", t.request_sent },
+      { "Waiting (TTFB)", t.first_byte, "waiting" },
+      { t.first_byte > 0 and "Download" or "Until error", t.total },
+    }
+  local marks = { { "DNS lookup", t.dns }, { "TCP connect", t.connect }, { "TLS handshake", t.tls } }
+  vim.list_extend(marks, exchange)
+  vim.list_extend(marks, { { "curl start, exit", t.exited }, { "Neovim loop", t.wall } })
+  local l = { ("%-20s %11s %11s"):format("Timing", "phase", "elapsed") }
+  local prev, waiting = 0, nil
+  for _, m in ipairs(marks) do
+    if m[2] and m[2] > 0 then
+      local at = math.max(prev, m[2])
+      l[#l + 1] = ("  %-18s %s %s"):format(m[1], ms(at - prev), ms(at))
+      if m[3] == "waiting" then
+        waiting = at - prev
+      end
+      prev = at
+    end
+  end
+  if early then
+    l[#l + 1] = "  (the first byte came before the upload ended: a 100 Continue or an early reply)"
+  end
+  if #t.server > 0 then
+    vim.list_extend(l, server_lines(t.server, waiting))
+  end
+  if t.remote then
+    local http = t.http_version ~= "0" and ("  HTTP/" .. t.http_version) or ""
+    l[#l + 1] = ("Connection: %s%s"):format(t.remote, http)
+  end
+  l[#l + 1] = ("Bytes: %d sent, %d received"):format(t.bytes_sent, t.bytes_received)
+  return l
+end
+
 local function verbose_text(res)
   local l = {}
   local q = res.request
@@ -184,6 +247,10 @@ local function verbose_text(res)
   if res.error then
     l[#l + 1] = ""
     l[#l + 1] = "Error: " .. res.error
+  end
+  if res.timing then
+    l[#l + 1] = ""
+    vim.list_extend(l, timing_lines(res.timing))
   end
   return table.concat(l, "\n")
 end
@@ -304,7 +371,12 @@ local function post(run, sec, res)
   end
   ctx.api.request = vim.tbl_extend("force", res.request, { headers = req_headers })
   local decoded
-  ctx.api.response = setmetatable({ status = r.status, headers = r.headers, body = r.body }, {
+  ctx.api.response = setmetatable({
+    status = r.status,
+    headers = r.headers,
+    body = r.body,
+    timing = vim.deepcopy(res.timing),
+  }, {
     __index = function(_, k)
       if k == "json" then
         if not decoded then
@@ -363,12 +435,13 @@ step = function(run)
   res.request = req
   local sent, handle = pcall(transport.send, req, { timeout = config.options.timeout }, function(r)
     run.handle = nil
+    res.timing = r.timing
     if r.outcome ~= "ok" then
       res.outcome, res.error = r.outcome, r.error or r.outcome
       return record(run, res, true)
     end
     res.outcome = "ok"
-    res.response = { status = r.status, headers = r.headers, body = r.body, time = r.time }
+    res.response = { status = r.status, headers = r.headers, body = r.body, time = r.timing.total }
     post(run, sec, res)
     record(run, res, false)
   end)

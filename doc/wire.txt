@@ -245,7 +245,7 @@ Post-scripts also see:
 
   request     The request as sent: `name`, `method`, `url`, `headers`, `body`.
   response    `status` (number), `headers`, `body` (string), `json` (decoded
-              body, or `nil`). JSON arrays are 1-based.
+              body, or `nil`), `timing`. JSON arrays are 1-based.
   test(name, fn)   Runs `fn(t)` as a named test.
 
 Header tables are keyed by lower-cased name. >lua
@@ -265,6 +265,18 @@ A failed assertion is recorded and the test continues. An error inside `fn`
 fails that test. An error in a pre-script aborts the section; an error in a
 post-script becomes a failed test named after the script, and the run goes
 on. The HTTP status never decides pass or fail by itself.
+
+`response.timing` holds seconds since the transfer started at which curl
+reached each point, 0 if it did not: `dns`, `connect`, `tls`, `request_sent`
+(`nil` before curl 8.10), `first_byte` (a `100 Continue` counts), `total`;
+then `exited` (curl exited) and `wall` (wire got the result). `server`
+lists the `Server-Timing` entries of every such header as
+`{ name, duration, desc }`, `duration` in seconds. Also `remote` (`ip:port`, `[ip]:port` for IPv6),
+`http_version`, `bytes_sent`, `bytes_received`. >lua
+    test("fast", function(t)
+      t.ok(response.timing.first_byte < 0.5, "first byte within 500 ms")
+    end)
+<
 
 ==============================================================================
 8. HELPERS                                                      *wire-helpers*
@@ -422,7 +434,13 @@ text (green on success, red on failure). Focus stays in the `.http` buffer.
   B    Body, typed by Content-Type; JSON pretty-printed with `jq`.
   H    Response headers.
   A    Headers and body.
-  V    Verbose: the request as sent, then the response status and headers.
+  V    Verbose: the request as sent, then the response status and headers,
+       then the timing: DNS lookup, TCP connect, TLS handshake, sending,
+       waiting for the first byte and download, as measured by curl, plus
+       starting and ending curl and waiting for Neovim's event loop; the
+       server's `Server-Timing` entries with the wait minus the longest
+       one; then the remote address, HTTP version and bytes sent and
+       received.
   O    Script Output: `log()` output and script errors.
   R    Report, as a markdown table: one row per section of the run and one
        per test (`✔`/`✘`), then the failure messages under a heading per
