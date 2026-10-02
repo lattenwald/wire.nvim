@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/lattenwald/wire.nvim/compare/v0.5.0...v0.6.0) (2026-10-02)
+
+
+### Features
+
+* **lsp:** optional in-process language server: symbols, definition, hover, code actions ([652bbd5](https://github.com/lattenwald/wire.nvim/commit/652bbd52f32869bf5362c4cd613408e21376002a))
+
 ## [0.5.0](https://github.com/lattenwald/wire.nvim/compare/v0.4.0...v0.5.0) (2026-10-02)
 
 
