@@ -48,33 +48,12 @@ function M.classify(lines, defaults)
   end
 
   local function inline(n, from)
-    local l = lines[n]
-    local exprs, pos = {}, from + 1
-    while true do
-      local s = l:find("{%=", pos, true)
-      if not s then
-        break
-      end
-      local e = l:find("%}", s + 3, true)
-      local stop = e and e + 1 or #l
-      exprs[#exprs + 1] = { s, stop }
-      add(n, s - 1, stop, "WireExpression", INLINE)
-      pos = stop + 1
+    local exprs, vars = template.inline(lines[n], from + 1)
+    for _, r in ipairs(exprs) do
+      add(n, r[1] - 1, r[2], "WireExpression", INLINE)
     end
-    pos = from + 1
-    while true do
-      local s, e = l:find(template.PLACEHOLDER, pos)
-      if not s then
-        break
-      end
-      local inside = false
-      for _, r in ipairs(exprs) do
-        inside = inside or (s >= r[1] and s <= r[2])
-      end
-      if not inside then
-        add(n, s - 1, e, "WirePlaceholder", INLINE)
-      end
-      pos = e + 1
+    for _, r in ipairs(vars) do
+      add(n, r[1] - 1, r[2], "WirePlaceholder", INLINE)
     end
   end
 

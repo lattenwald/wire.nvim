@@ -22,6 +22,36 @@ local function scan(s, st)
   end
 end
 
+-- 1-based inclusive spans in one line: `{%= … %}` expressions, and `{{name}}` outside them
+function M.inline(l, from)
+  local exprs, vars, pos = {}, {}, from
+  while true do
+    local s = l:find("{%=", pos, true)
+    if not s then
+      break
+    end
+    local e = l:find("%}", s + 3, true)
+    exprs[#exprs + 1] = { s, e and e + 1 or #l }
+    pos = exprs[#exprs][2] + 1
+  end
+  pos = from
+  while true do
+    local s, e, name = l:find(PLACEHOLDER, pos)
+    if not s then
+      break
+    end
+    local inside = false
+    for _, r in ipairs(exprs) do
+      inside = inside or (s >= r[1] and s <= r[2])
+    end
+    if not inside then
+      vars[#vars + 1] = { s, e, name }
+    end
+    pos = e + 1
+  end
+  return exprs, vars
+end
+
 function M.render(ctx, text, opts)
   opts = opts or {}
   local where = opts.where or "template"

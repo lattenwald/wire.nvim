@@ -16,14 +16,6 @@ M.active = nil
 
 local run_seq = 0
 
-local function vars_map(list)
-  local m = {}
-  for _, v in ipairs(list) do
-    m[v.name] = v.value
-  end
-  return m
-end
-
 function M.mark_row(res)
   if vim.api.nvim_buf_is_valid(res.buf) then
     return vim.api.nvim_buf_get_extmark_by_id(res.buf, M.ns, res.mark, {})[1]
@@ -134,7 +126,7 @@ local function snapshot(buf, which, row)
     env_private = e.private or {},
     default_headers = e.default_headers or {},
     private_headers = e.private_headers or {},
-    doc_vars = vars_map(doc.preamble.vars),
+    doc_vars = document.vars_map(doc.preamble.vars),
     helpers = hs,
     compiled = compiled,
   }
@@ -421,7 +413,7 @@ step = function(run)
     time = os.time(),
   }
   hook(run, "started", res)
-  ctx:begin_section(vars_map(sec.vars))
+  ctx:begin_section(document.vars_map(sec.vars))
   local ok, req = pcall(function()
     for _, s in ipairs(snap.compiled[sec].pre) do
       ctx:call(s.fn)
@@ -468,7 +460,7 @@ function M.request_at(buf, row)
   local snap = snapshot(buf, "cursor", row)
   local sec = snap.sections[1]
   local ctx = new_context(snap, vim.deepcopy(context.script_vars(buf)))
-  ctx:begin_section(vars_map(sec.vars))
+  ctx:begin_section(document.vars_map(sec.vars))
   for _, s in ipairs(snap.compiled[sec].pre) do
     ctx:call(s.fn)
   end

@@ -204,6 +204,14 @@ function M.parse(lines)
   return doc
 end
 
+function M.vars_map(list)
+  local m = {}
+  for _, v in ipairs(list) do
+    m[v.name] = v.value
+  end
+  return m
+end
+
 function M.section_at(doc, row)
   for _, sec in ipairs(doc.sections) do
     if row >= sec.line and row <= sec.last then

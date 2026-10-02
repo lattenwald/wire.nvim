@@ -148,24 +148,30 @@ function Ctx:_render_def(key, text, private)
   return v
 end
 
-function Ctx:lookup(name)
-  local s = self.section_vars[name]
-  if s then
-    return self:_render_def("s:" .. name, s)
+local LAYERS =
+  { { "section", "section_vars" }, { "script", "script_vars" }, { "doc", "doc_vars" }, { "env", "env_vars" } }
+local MEMO = { section = "s:", doc = "d:", env = "e:" }
+
+-- the layer a send takes `name` from, and its unrendered value
+function Ctx:source(name)
+  for _, l in ipairs(LAYERS) do
+    local v = self[l[2]][name]
+    if v ~= nil then
+      return l[1], v
+    end
   end
-  local v = self.script_vars[name]
-  if v ~= nil then
+  local p = os.getenv(name)
+  if p then
+    return "process", p
+  end
+end
+
+function Ctx:lookup(name)
+  local kind, v = self:source(name)
+  if not MEMO[kind] then
     return v
   end
-  local d = self.doc_vars[name]
-  if d then
-    return self:_render_def("d:" .. name, d)
-  end
-  local e = self.env_vars[name]
-  if e then
-    return self:_render_def("e:" .. name, e, self.env_private[name])
-  end
-  return os.getenv(name)
+  return self:_render_def(MEMO[kind] .. name, v, kind == "env" and self.env_private[name])
 end
 
 function Ctx:set_var(name, v)
