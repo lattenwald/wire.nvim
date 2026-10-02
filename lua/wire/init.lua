@@ -81,6 +81,19 @@ function M.open()
   require("wire.ui.response").open()
 end
 
+function M.yank()
+  local buf = vim.api.nvim_get_current_buf()
+  local ok, text = pcall(function()
+    local req = require("wire.run").request_at(buf, vim.api.nvim_win_get_cursor(0)[1])
+    return require("wire.transport").yank_text(req)
+  end)
+  if not ok then
+    return notify(require("wire.mask").apply(text), vim.log.levels.ERROR)
+  end
+  vim.fn.setreg(vim.v.register, text)
+  notify("curl command yanked (unmasked)")
+end
+
 function M.reset()
   if busy() then
     return
@@ -155,6 +168,7 @@ M.subcommands = {
   env = M.select_env,
   scratch = M.scratchpad,
   reset = M.reset,
+  yank = M.yank,
 }
 
 function M.command(args)

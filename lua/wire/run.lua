@@ -452,6 +452,29 @@ step = function(run)
   run.handle = handle
 end
 
+local function new_context(snap, script_vars)
+  return context.new({
+    doc_vars = snap.doc_vars,
+    env_unselected = snap.env_unselected,
+    env_vars = snap.env_vars,
+    env_private = snap.env_private,
+    script_vars = script_vars,
+    helpers = snap.helpers,
+    base_dir = snap.base_dir,
+  })
+end
+
+function M.request_at(buf, row)
+  local snap = snapshot(buf, "cursor", row)
+  local sec = snap.sections[1]
+  local ctx = new_context(snap, vim.deepcopy(context.script_vars(buf)))
+  ctx:begin_section(vars_map(sec.vars))
+  for _, s in ipairs(snap.compiled[sec].pre) do
+    ctx:call(s.fn)
+  end
+  return prepare(ctx, snap, sec)
+end
+
 function M.start(buf, which, row, hooks)
   if M.active then
     vim.notify("wire: a run is already active", vim.log.levels.WARN)
@@ -474,15 +497,7 @@ function M.start(buf, which, row, hooks)
   for _, sec in ipairs(snap.sections) do
     run.marks[sec] = vim.api.nvim_buf_set_extmark(buf, M.ns, sec.line - 1, 0, {})
   end
-  run.ctx = context.new({
-    doc_vars = snap.doc_vars,
-    env_unselected = snap.env_unselected,
-    env_vars = snap.env_vars,
-    env_private = snap.env_private,
-    script_vars = context.script_vars(buf),
-    helpers = snap.helpers,
-    base_dir = snap.base_dir,
-  })
+  run.ctx = new_context(snap, context.script_vars(buf))
   M.active = run
   step(run)
   return run

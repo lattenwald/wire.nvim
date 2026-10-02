@@ -169,6 +169,28 @@ T["every Server-Timing header reaches scripts and Verbose"] = function()
   eq(r.verbose:find("\n  Waiting %- app%s+%-?[%d.]+ ms") ~= nil, true)
 end
 
+T[":Wire yank renders as a send would, unmasked, and keeps script variables"] = function()
+  local root = H.tmpdir()
+  H.trust(H.write(root .. "/http-client.env.json", [[{ "dev": { "base": "http://h.invalid" } }]]))
+  H.trust(H.write(root .. "/http-client.private.env.json", [[{ "dev": { "key": "pv-secret-9" } }]]))
+  local buf = H.http_buf(root .. "/r.http", {
+    "### one",
+    '< {% vars.step = "pre" %}',
+    "GET {{base}}/{{step}}",
+    "X-Key: {{key}}",
+  })
+  context.script_vars(buf).step = "old"
+  vim.api.nvim_set_current_buf(buf)
+  vim.api.nvim_win_set_cursor(0, { 3, 0 })
+  vim.fn.setreg('"', "")
+  require("wire").yank()
+  local text = vim.fn.getreg('"')
+  eq(text:find('url = "http://h.invalid/pre"', 1, true) ~= nil, true)
+  eq(text:find('header = "X-Key: pv-secret-9"', 1, true) ~= nil, true)
+  eq(context.script_vars(buf).step, "old")
+  eq(server.requests(), {})
+end
+
 T["script variables outlive a run, not a reset"] = function()
   local buf = H.http_buf(H.tmpdir() .. "/r.http", {
     "### set",

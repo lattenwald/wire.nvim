@@ -48,6 +48,7 @@ trusting env and helper files you save. Run `:checkhealth wire` afterwards.
 
 ```lua
 vim.pack.add({ "https://github.com/lattenwald/wire.nvim" })
+    { "<leader>Ry", "<cmd>Wire yank<cr>", desc = "Yank request as curl" },
 require("wire").setup({})
 
 vim.keymap.set("n", "<leader>Rs", "<cmd>Wire send<cr>", { desc = "Send request" })
@@ -64,6 +65,7 @@ wire defines no global mappings; the keys above are a suggestion.
 
 Releases are tagged `vX.Y.Z` following [semver](https://semver.org), with changes listed
 in [CHANGELOG.md](CHANGELOG.md); the `stable` tag marks the latest release. Before 1.0 a
+vim.keymap.set("n", "<leader>Ry", "<cmd>Wire yank<cr>", { desc = "Yank request as curl" })
 breaking change bumps the minor version. `main` gets every change first; to stay on
 releases, add `version = "*"` to the lazy.nvim spec, or pass
 `{ src = "https://github.com/lattenwald/wire.nvim", version = vim.version.range("*") }`
@@ -107,7 +109,7 @@ require("wire").setup({
 Secrets are masked in everything wire displays; response bodies and headers are shown as
 received.
 
-`:Wire send|all|cancel|open|env|scratch|reset`. Full documentation: `:help wire`.
+`:Wire send|all|cancel|open|env|scratch|reset|yank`. Full documentation: `:help wire`.
 
 ### Statusline
 

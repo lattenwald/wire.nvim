@@ -57,6 +57,7 @@ With lazy.nvim: >lua
         { "<leader>Re", "<cmd>Wire env<cr>", desc = "Select environment" },
         { "<leader>Rc", "<cmd>Wire cancel<cr>", desc = "Cancel run" },
         { "<leader>Ro", "<cmd>Wire open<cr>", desc = "Open response" },
+        { "<leader>Ry", "<cmd>Wire yank<cr>", desc = "Yank as curl" },
       },
     }
 <
@@ -123,6 +124,11 @@ wire defines no global mappings.
 :Wire scratch   Open the scratchpad, `stdpath("data")/wire/scratchpad.http`.
                 Its base directory is the cwd at the moment you run this.
 :Wire reset     Clear the script variables of the current buffer.
+:Wire yank      Yank the request under the cursor as an unmasked
+                `curl -K -` command into |v:register|, rendered as a send
+                would: current environment, variables, and its pre-request
+                scripts, which run on a copy of the script variables.
+                Nothing is sent.
 
 One run is active at a time; starting another, `:Wire env` or `:Wire reset`
 while busy does nothing.

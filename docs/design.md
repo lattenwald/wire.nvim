@@ -637,7 +637,12 @@ URLs.
 
 ### 9.5 Commands and keys
 
-`:Wire send|all|cancel|open|env|scratch|reset`. The plugin defines no global mappings.
+`:Wire send|all|cancel|open|env|scratch|reset|yank`. The plugin defines no global mappings.
+
+`:Wire yank` copies the request under the cursor the way `Y` does in the response window,
+without sending it: the section is checked and rendered like a one-request run (environment,
+variables, helpers, pre-request scripts), with the pre-scripts writing to a copy of the
+buffer's script variables, so a yank leaves no trace in later sends.
 
 ### 9.6 Health
 

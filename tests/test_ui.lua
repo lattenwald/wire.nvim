@@ -6,7 +6,7 @@ local T = MiniTest.new_set()
 
 T[":Wire completes subcommands in a stable order"] = function()
   vim.cmd("runtime plugin/wire.lua")
-  eq(vim.fn.getcompletion("Wire ", "cmdline"), { "all", "cancel", "env", "open", "reset", "scratch", "send" })
+  eq(vim.fn.getcompletion("Wire ", "cmdline"), { "all", "cancel", "env", "open", "reset", "scratch", "send", "yank" })
 end
 
 T["a result leaving the history takes its ### mark with it"] = function()
