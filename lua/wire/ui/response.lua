@@ -119,7 +119,7 @@ local function winbar()
     local hl = t.id == state.tab and "%#TabLineSel#" or "%#TabLine#"
     parts[#parts + 1] = ("%s%%%d@v:lua.wire_tab_click@ %s (%s) %%X"):format(hl, i, t.label, t.key)
   end
-  parts[#parts + 1] = ("%%#TabLineFill#  [%d/%d]"):format(viewed, #history)
+  parts[#parts + 1] = ("%%<%%#TabLineFill#  [%d/%d]%%= g? keys "):format(viewed, #history)
   return table.concat(parts)
 end
 

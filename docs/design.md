@@ -500,7 +500,7 @@ send and reuses the window while it is visible. Focus stays in the `.http` buffe
 The winbar holds clickable tabs, kulala-style:
 
 ```
- Body (B)  Headers (H)  All (A)  Verbose (V)  Script Output (O)  Report (R)   [ ]
+ Body (B)  Headers (H)  All (A)  Verbose (V)  Script Output (O)  Report (R)   [ ]     g? keys
 ```
 
 Above the first line of every tab, virtual lines (`virt_lines_above`) show a summary, green

@@ -457,9 +457,10 @@ The first summary line starts with the result's place in history,
 `Result: 2/5`, and, for a run that sent several requests, its place in that
 run, `Request: 3/14`.
 
-The tabs are also clickable in the winbar. A result with a failed test opens
-on Report, an abort on Script Output; otherwise a visible window keeps its
-tab. The `###` line of each sent section shows an icon: `✔ 200 · 0.42 s`,
+The tabs are also clickable in the winbar, which ends with a `g? keys`
+reminder. A result with a failed test opens on Report, an abort on Script
+Output; otherwise a visible window keeps its tab. The `###` line of each
+sent section shows an icon: `✔ 200 · 0.42 s`,
 `✘ 500 · 2 failed`, `✘ aborted`, `✘ cancelled` or the curl error.
 
 ==============================================================================
