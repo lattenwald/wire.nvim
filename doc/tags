@@ -10,6 +10,7 @@ wire-headers	wire.txt	/*wire-headers*
 wire-helpers	wire.txt	/*wire-helpers*
 wire-highlight	wire.txt	/*wire-highlight*
 wire-json	wire.txt	/*wire-json*
+wire-lsp	wire.txt	/*wire-lsp*
 wire-masking	wire.txt	/*wire-masking*
 wire-options	wire.txt	/*wire-options*
 wire-response	wire.txt	/*wire-response*

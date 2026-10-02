@@ -35,8 +35,8 @@ local function scalar(v)
   end
 end
 
-local function read(path, untrusted)
-  local content, why = project.read_trusted(path)
+local function read(path, untrusted, reader)
+  local content, why = reader(path)
   if why == "untrusted" then
     table.insert(untrusted, path)
   end
@@ -67,13 +67,17 @@ local function unknown_keys(data, file, out)
   end
 end
 
-function M.load(root)
+-- opts.read replaces project.read_trusted; opts.origin adds each environment's `origin`
+function M.load(root, opts)
+  opts = opts or {}
   local res, untrusted = { names = {}, envs = {}, warnings = {} }, {}
   if not root then
     return res, untrusted
   end
-  local public = read(root .. "/http-client.env.json", untrusted)
-  local private = read(root .. "/http-client.private.env.json", untrusted)
+  local reader = opts.read or project.read_trusted
+  local public_path, private_path = root .. "/http-client.env.json", root .. "/http-client.private.env.json"
+  local public = read(public_path, untrusted, reader)
+  local private = read(private_path, untrusted, reader)
   unknown_keys(public, "http-client.env.json", res.warnings)
   unknown_keys(private, "http-client.private.env.json", res.warnings)
   table.sort(res.warnings)
@@ -105,7 +109,32 @@ function M.load(root)
           end
         end
       end
-      res.envs[name] = { vars = vars, private = priv, default_headers = headers, private_headers = priv_headers }
+      local origin
+      if opts.origin then
+        origin = {}
+        -- the file and object each value comes from; sources in rising precedence
+        for _, src in ipairs({
+          { public_path, public, "$shared" },
+          { private_path, private, "$shared" },
+          { public_path, public, name },
+          { private_path, private, name },
+        }) do
+          if is_object(src[2][src[3]]) then
+            for k in pairs(src[2][src[3]]) do
+              if vars[k] then
+                origin[k] = { path = src[1], env = src[3] }
+              end
+            end
+          end
+        end
+      end
+      res.envs[name] = {
+        vars = vars,
+        private = priv,
+        origin = origin,
+        default_headers = headers,
+        private_headers = priv_headers,
+      }
       table.insert(res.names, name)
     end
   end

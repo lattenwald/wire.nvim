@@ -64,13 +64,39 @@ local function hooks()
   }
 end
 
+local function yank_at(buf, row)
+  local ok, text = pcall(function()
+    local req = require("wire.run").request_at(buf, row)
+    return require("wire.transport").yank_text(req)
+  end)
+  if not ok then
+    return notify(require("wire.mask").apply(text), vim.log.levels.ERROR)
+  end
+  vim.fn.setreg(vim.v.register, text)
+  notify("curl command yanked (unmasked)")
+end
+
+-- the language server's code actions, by command name
+M.actions = {
+  send = function(buf, row)
+    require("wire.run").start(buf, "cursor", row, hooks())
+  end,
+  send_all = function(buf)
+    require("wire.run").start(buf, "all", nil, hooks())
+  end,
+  yank = yank_at,
+}
+
+local function cursor()
+  return vim.api.nvim_get_current_buf(), vim.api.nvim_win_get_cursor(0)[1]
+end
+
 function M.send()
-  local buf = vim.api.nvim_get_current_buf()
-  require("wire.run").start(buf, "cursor", vim.api.nvim_win_get_cursor(0)[1], hooks())
+  M.actions.send(cursor())
 end
 
 function M.send_all()
-  require("wire.run").start(vim.api.nvim_get_current_buf(), "all", nil, hooks())
+  M.actions.send_all(vim.api.nvim_get_current_buf())
 end
 
 function M.cancel()
@@ -82,16 +108,7 @@ function M.open()
 end
 
 function M.yank()
-  local buf = vim.api.nvim_get_current_buf()
-  local ok, text = pcall(function()
-    local req = require("wire.run").request_at(buf, vim.api.nvim_win_get_cursor(0)[1])
-    return require("wire.transport").yank_text(req)
-  end)
-  if not ok then
-    return notify(require("wire.mask").apply(text), vim.log.levels.ERROR)
-  end
-  vim.fn.setreg(vim.v.register, text)
-  notify("curl command yanked (unmasked)")
+  yank_at(cursor())
 end
 
 function M.reset()

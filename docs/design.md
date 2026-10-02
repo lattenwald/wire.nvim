@@ -650,6 +650,41 @@ buffer's script variables, so a yank leaves no trace in later sends.
 7.83, a warning for jq below 1.7), the `json` parser (optional), and the current buffer's base and project directories with the project files
 found. Trust status is not shown: `vim.secure` has no public query; `:trust` manages it.
 
+### 9.7 Language server
+
+`lsp/wire.lua` is a `vim.lsp.config` entry whose `cmd` is a Lua function
+(`wire.lsp.server`): the server runs in Neovim's process, answers each request
+synchronously and reads the buffer itself, so it declares no document sync. Its
+`positionEncoding` is `utf-8`, making columns byte offsets as in the parser.
+
+There is one client per project root (the file's directory outside a project). Unnamed
+buffers get none: their URI is a bare `file://`, which maps back to no buffer.
+
+It is opt-in, with `vim.lsp.enable("wire")`. With lazy.nvim that goes in the spec's `init`:
+lazy creates its `ft` handler before running `init`, so on the first `.http` buffer the
+plugin is on the runtimepath before `vim.lsp.enable`'s `FileType` handler looks up
+`lsp/wire.lua`, and `vim.lsp.enable` after startup attaches buffers already open.
+
+- `documentSymbol`: the preamble's `@name` variables, then one symbol per section with its
+  variables as children.
+- `definition` and `hover` on `{{name}}` ask a context built like a send's which layer
+  defines the name (`Ctx:source`, the first half of `Ctx:lookup`), so the order lives in
+  one place. Nothing runs: values are shown unrendered, since rendering can evaluate
+  `{%= %}` and helpers. Definition leaves script variables out, having no line. Lines inside script blocks are
+  Lua, so a `{{name}}` there is ignored. The env
+  files come from `env.load` with `project.read_file` in place of `read_trusted`, as they
+  are only displayed (a parse error is shown in the hover); its opt-in `origin` gives the file and object each value comes from, and
+  a small key scanner finds the line, as `vim.json.decode` keeps no positions. Private
+  values hover as `••••` while masking is on (`mask.hide`).
+- `definition` on a `<`/`>` file line returns the script file.
+- `codeAction` offers send, send all and yank in a section with a request, as commands
+  `wire.send`, `wire.send_all` and `wire.yank`; `workspace/executeCommand` calls the entry
+  of that name in `require("wire").actions` with the action's buffer and row, and refuses
+  any other command, or one whose buffer changed since it was offered (the arguments carry
+  `changedtick`). Having side effects and no kind, the actions are never offered to a
+  request filtered by kind (`context.only`). The public `send`, `send_all` and `yank` take no arguments, so they
+  stay safe as callbacks.
+
 ## 10. Configuration
 
 ```lua
@@ -686,6 +721,8 @@ lua/wire/
   ui/report.lua   Report tab
   ui/icons.lua    inline extmarks
   highlight.lua   line-role highlighting, embedded JSON/Lua via tree-sitter
+  lsp.lua         in-process language server: symbols, definition, hover, code actions
+lsp/wire.lua      vim.lsp.config entry for the server
 plugin/wire.lua   :Wire command
 tests/            mini.test specs, fixtures, server.py
 docs/design.md    this document
@@ -702,6 +739,8 @@ Dependencies:
   `template` and `script` → `context`.
 - `run` → `document`, `context`, `template`, `script`, `transport`.
 - `ui/*` depend only on results (§7.2).
+- `lsp` → `document`, `env`, `project`, `context`, `template`, `mask`; its code actions
+  call `init`.
 - `init` wires them together.
 
 Data:

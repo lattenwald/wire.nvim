@@ -37,6 +37,10 @@ function M.register_header(name, value)
   end
 end
 
+function M.hide(s)
+  return config.options.mask and MASK or s
+end
+
 function M.apply(s)
   if not config.options.mask then
     return s

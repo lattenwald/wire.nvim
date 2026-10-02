@@ -21,8 +21,8 @@ test: deps/mini.test ## Run the tests headless (one file: FILE=tests/test_x.lua)
 
 .PHONY: lint
 lint: ## Check formatting, lint and the help file
-	stylua --check lua plugin tests
-	selene lua plugin tests
+	stylua --check lua lsp plugin tests
+	selene lua lsp plugin tests
 	$(NVIM_BIN) --headless --clean --cmd "set rtp^=." -l tests/doccheck.lua
 
 .PHONY: doc
@@ -31,4 +31,4 @@ doc: ## Regenerate doc/tags
 
 .PHONY: format
 format: ## Format the Lua sources
-	stylua lua plugin tests
+	stylua lua lsp plugin tests

@@ -17,7 +17,8 @@ CONTENTS                                                       *wire-contents*
  12. Secret masking ...................................... |wire-masking|
  13. Response window ..................................... |wire-response|
  14. Highlighting ........................................ |wire-highlight|
- 15. Lua API ............................................. |wire-api|
+ 15. Language server ..................................... |wire-lsp|
+ 16. Lua API ............................................. |wire-api|
 
 ==============================================================================
 1. INTRODUCTION                                                         *wire*
@@ -43,6 +44,7 @@ discovery and trusting files you save.
 With vim.pack: >lua
     vim.pack.add({ "https://github.com/lattenwald/wire.nvim" })
     require("wire").setup({})
+    vim.lsp.enable("wire") -- optional: the language server
 <
 With lazy.nvim: >lua
     {
@@ -50,6 +52,10 @@ With lazy.nvim: >lua
       ft = "http",
       cmd = "Wire",
       opts = {},
+      -- optional: the language server
+      init = function()
+        vim.lsp.enable("wire")
+      end,
       keys = {
         { "<leader>Rs", "<cmd>Wire send<cr>", desc = "Send request" },
         { "<leader>Ra", "<cmd>Wire all<cr>", desc = "Send all requests" },
@@ -553,7 +559,39 @@ project already read this session. A templated Content-Type is not evaluated
 for colouring; the body's first character decides.
 
 ==============================================================================
-15. LUA API                                                         *wire-api*
+15. LANGUAGE SERVER                                                 *wire-lsp*
+
+wire ships a language server for `.http` buffers. It runs inside Neovim, so
+there is nothing to install, and it is off until `vim.lsp.enable("wire")`;
+|wire-setup| shows where that goes for vim.pack and lazy.nvim.
+
+Its settings change with |vim.lsp.config()|, as for any server. The keys
+below are Neovim's defaults (|lsp-defaults|); pickers, outline and
+completion plugins that speak LSP use the same answers.
+
+  Symbols       |gO|: the file's `@name` variables, then each `###` section
+                with its own.
+  Definition    `CTRL-]` on `{{name}}`: the definition a send would use, in
+                the order of |wire-variables|. Script variables have no line
+                and are skipped. In the env files, the selected environment
+                comes before `$shared` and the private file before the
+                public one; with no environment selected, every
+                environment's entry is listed. On a `<` or `>` line, the
+                script file.
+  Hover         |K| on `{{name}}`: where a send would take the value from,
+                script variables included, and the definition unrendered.
+                Values a send masks, those of names that appear in
+                `http-client.private.env.json`, show as `••••` while masking
+                is on (|wire-masking|); a process environment value is not
+                shown.
+  Code actions  |gra| in a section: send it, send the file, or yank it as
+                curl, like |:Wire| send, all and yank.
+
+Hover and definition read the env files without |:trust|: they show text and
+run nothing.
+
+==============================================================================
+16. LUA API                                                         *wire-api*
 
 `require("wire")`:
 

@@ -11,6 +11,8 @@ A small `.http` client for Neovim. The design is in [docs/design.md](docs/design
   `Server-Timing`.
 - Secrets masked everywhere wire shows them; project files gated by `:trust`.
 - Copy a request as a `curl` command, from the `.http` buffer or the response window.
+- An optional built-in language server: sections in `gO` and pickers, go to a variable's
+  definition, hover for its value, code actions to send or yank.
 
 ## Requirements
 
@@ -41,6 +43,10 @@ trusting env and helper files you save. Run `:checkhealth wire` afterwards.
   ft = "http",
   cmd = "Wire",
   opts = {},
+  -- optional: the language server
+  init = function()
+    vim.lsp.enable("wire")
+  end,
   keys = {
     { "<leader>Rs", "<cmd>Wire send<cr>", desc = "Send request" },
     { "<leader>Ra", "<cmd>Wire all<cr>", desc = "Send all requests" },
@@ -58,6 +64,7 @@ trusting env and helper files you save. Run `:checkhealth wire` afterwards.
 ```lua
 vim.pack.add({ "https://github.com/lattenwald/wire.nvim" })
 require("wire").setup({})
+vim.lsp.enable("wire") -- optional: the language server
 
 vim.keymap.set("n", "<leader>Rs", "<cmd>Wire send<cr>", { desc = "Send request" })
 vim.keymap.set("n", "<leader>Ra", "<cmd>Wire all<cr>", { desc = "Send all requests" })
@@ -135,6 +142,14 @@ require("lualine").setup({
   },
 })
 ```
+
+### Language server
+
+wire ships an in-process language server for `.http` files, off until
+`vim.lsp.enable("wire")` (see [Installation](#installation)). It lists sections and
+variables as symbols, jumps from `{{name}}` to its definition (section, file or env file),
+shows where a value comes from on hover, and offers send and yank as code actions. See
+`:help wire-lsp`.
 
 ## The dialect
 
