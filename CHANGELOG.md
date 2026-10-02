@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/lattenwald/wire.nvim/compare/v0.4.0...v0.5.0) (2026-10-02)
+
+
+### Features
+
+* :Wire yank copies the request under the cursor as curl, without sending ([d89b266](https://github.com/lattenwald/wire.nvim/commit/d89b266c4e3c6c2f7ace47b0d276d2d21436d19b))
+* **ui:** g? hint in the response window winbar, truncated after the tabs ([857e785](https://github.com/lattenwald/wire.nvim/commit/857e7857968e507e09f3970aead5f7bc2d7d9c5e))
+
 ## [0.4.0](https://github.com/lattenwald/wire.nvim/compare/v0.3.0...v0.4.0) (2026-10-02)
 
 
