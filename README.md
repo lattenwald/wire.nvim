@@ -14,6 +14,9 @@ A small `.http` client for Neovim. The design is in [docs/design.md](docs/design
 - An optional built-in language server: sections in `gO` and pickers, go to a variable's
   definition, hover for its value, code actions to send or yank.
 
+Examples of every collection feature, runnable against public echo services or a local one:
+[wire.nvim-examples](https://github.com/lattenwald/wire.nvim-examples).
+
 ## Requirements
 
 - Neovim ≥ 0.12
